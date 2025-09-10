@@ -1,0 +1,21 @@
+# Bloomberg API Python Library
+blpapi==3.19.1
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Configuration
+PyYAML>=6.0
+
+# Database
+# SQLite3 is included in Python standard library
+
+# Optional: For Excel export
+openpyxl>=3.1.0
+
+# Optional: For Parquet format
+pyarrow>=12.0.0
+
+# Logging and utilities
+python-dateutil>=2.8.2

@@ -1,0 +1,91 @@
+# Bloomberg Options Fetcher Configuration
+# Edit this file to customize your settings
+
+bloomberg:
+  host: localhost
+  port: 8194
+
+qqq_options:
+  # Number of strikes above and below current price
+  strikes_above: 20
+  strikes_below: 20
+  
+  # Strike interval (adjust based on QQQ price level)
+  # Use 2.5 for QQQ around 400-500
+  strike_interval: 2.5
+  
+  # Which monthly expiries to fetch (1 = next month, 2 = month after, etc.)
+  expiries_to_fetch: [1, 2, 3]
+  
+  # For weekly options (optional)
+  include_weeklies: false
+
+# API usage limits
+limits:
+  # Bloomberg API limits (adjust based on your subscription)
+  daily_limit: 50000
+  monthly_limit: 500000
+  
+  # Batch processing settings
+  batch_size: 20  # Number of tickers per request
+  request_delay: 1.0  # Seconds between batches
+  
+  # Alert thresholds (percentage of limit)
+  daily_alert_threshold: 80
+  monthly_alert_threshold: 80
+
+# Historical data settings
+historical:
+  # Number of days to fetch
+  days_to_fetch: 60
+  
+  # Data frequency
+  frequency: DAILY  # DAILY, WEEKLY, MONTHLY
+  
+  # Limit to liquid strikes only
+  liquid_strikes_only: true
+  num_atm_strikes: 10  # Number of strikes around ATM to fetch
+
+# Output settings
+output:
+  # Output format: csv, parquet, excel, json
+  format: csv
+  
+  # Output directory
+  path: ./data/
+  
+  # Database settings
+  use_database: true
+  database_path: ./data/bloomberg_options.db
+  
+  # File naming
+  include_timestamp: true
+  filename_prefix: qqq_options
+
+# Data quality settings
+data_quality:
+  # Remove options with spreads greater than this percentage
+  max_spread_pct: 50
+  
+  # Minimum volume to consider option liquid
+  min_volume: 10
+  
+  # Remove options expiring in less than this many days
+  min_days_to_expiry: 1
+
+# Notification settings (optional)
+notifications:
+  enabled: false
+  email:
+    smtp_server: smtp.gmail.com
+    smtp_port: 587
+    from_email: your_email@gmail.com
+    to_email: your_email@gmail.com
+    # Store password securely, not in this file
+    
+# Logging settings
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR
+  log_file: ./logs/fetcher.log
+  max_file_size: 10485760  # 10MB
+  backup_count: 5
