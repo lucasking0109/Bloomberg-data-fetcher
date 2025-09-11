@@ -415,6 +415,94 @@ class DatabaseManager:
         
         df.to_csv(output_path, index=False)
         logger.info(f"Exported {len(df)} records to {output_path}")
+    
+    def export_to_parquet(self, 
+                         output_path: str,
+                         start_date: Optional[str] = None,
+                         end_date: Optional[str] = None):
+        """
+        Export data to Parquet file for efficient storage and fast access
+        
+        Args:
+            output_path: Output Parquet file path
+            start_date: Optional start date filter
+            end_date: Optional end date filter
+        """
+        conn = sqlite3.connect(self.db_path)
+        
+        query = "SELECT * FROM options_data"
+        params = []
+        
+        if start_date and end_date:
+            query += " WHERE fetch_date BETWEEN ? AND ?"
+            params = [start_date, end_date]
+        
+        query += " ORDER BY fetch_date, underlying, expiry, strike"
+        
+        df = pd.read_sql_query(query, conn, params=params if params else None)
+        conn.close()
+        
+        # Convert date columns to proper datetime types for better Parquet compression
+        if 'fetch_date' in df.columns:
+            df['fetch_date'] = pd.to_datetime(df['fetch_date'])
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+        if 'expiry' in df.columns:
+            df['expiry'] = pd.to_datetime(df['expiry'], format='%Y%m%d')
+        
+        df.to_parquet(output_path, index=False, compression='snappy')
+        logger.info(f"Exported {len(df)} records to {output_path} (Parquet format)")
+    
+    def export_constituent_options(self,
+                                  output_path: str,
+                                  format_type: str = 'parquet',
+                                  start_date: Optional[str] = None,
+                                  end_date: Optional[str] = None):
+        """
+        Export constituent options data with format selection
+        
+        Args:
+            output_path: Output file path (extension will be added based on format)
+            format_type: 'csv' or 'parquet'
+            start_date: Optional start date filter
+            end_date: Optional end date filter
+        """
+        conn = sqlite3.connect(self.db_path)
+        
+        query = "SELECT * FROM constituent_options"
+        params = []
+        
+        if start_date and end_date:
+            query += " WHERE fetch_date BETWEEN ? AND ?"
+            params = [start_date, end_date]
+        
+        query += " ORDER BY fetch_date, underlying, expiry, strike"
+        
+        df = pd.read_sql_query(query, conn, params=params if params else None)
+        conn.close()
+        
+        if df.empty:
+            logger.warning("No constituent options data found")
+            return
+        
+        # Add appropriate file extension
+        if not output_path.endswith(f'.{format_type}'):
+            output_path = f"{output_path}.{format_type}"
+        
+        if format_type.lower() == 'csv':
+            df.to_csv(output_path, index=False)
+        elif format_type.lower() == 'parquet':
+            # Convert date columns for better Parquet performance
+            if 'fetch_date' in df.columns:
+                df['fetch_date'] = pd.to_datetime(df['fetch_date'])
+            if 'timestamp' in df.columns:
+                df['timestamp'] = pd.to_datetime(df['timestamp'])
+            if 'expiry' in df.columns:
+                df['expiry'] = pd.to_datetime(df['expiry'], format='%Y%m%d')
+            
+            df.to_parquet(output_path, index=False, compression='snappy')
+        
+        logger.info(f"Exported {len(df)} constituent options records to {output_path} ({format_type.upper()} format)")
 
 
 if __name__ == "__main__":

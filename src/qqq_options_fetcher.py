@@ -148,24 +148,54 @@ class QQQOptionsFetcher:
     
     def get_expiry_dates(self) -> List[str]:
         """
-        Get monthly expiry dates for options
+        Get ALL available expiry dates for QQQ options (weekly + monthly)
+        QQQ has weekly expiries, not just monthly ones
         
         Returns:
             List of expiry dates in YYYYMMDD format
         """
         config = self.config.get('qqq_options', {})
-        months_ahead = config.get('expiries_to_fetch', [1, 2, 3])
+        max_days = config.get('max_days_to_expiry', 60)  # 2 months
         
         expiries = []
         today = datetime.now()
+        end_date = today + timedelta(days=max_days)
         
-        for month_offset in months_ahead:
-            # Calculate expiry (3rd Friday of the month)
-            expiry_month = today + timedelta(days=30 * month_offset)
-            expiry = self._get_third_friday(expiry_month)
-            expiries.append(expiry.strftime("%Y%m%d"))
+        # Generate all Fridays within the date range (QQQ has weekly expiries)
+        current_date = today
+        while current_date <= end_date:
+            # Find next Friday
+            days_ahead = 4 - current_date.weekday()  # Friday is weekday 4
+            if days_ahead <= 0:  # Target day already happened this week
+                days_ahead += 7
+            
+            friday = current_date + timedelta(days=days_ahead)
+            
+            # Only include if it's in the future
+            if friday > today:
+                expiries.append(friday.strftime("%Y%m%d"))
+            
+            # Move to next week
+            current_date = friday + timedelta(days=1)
         
-        logger.info(f"Expiry dates: {expiries}")
+        # Also add quarterly expiries (3rd Friday of March, June, September, December)
+        # These often have more liquidity
+        quarterly_months = [3, 6, 9, 12]
+        current_year = today.year
+        next_year = current_year + 1
+        
+        for year in [current_year, next_year]:
+            for month in quarterly_months:
+                quarterly_expiry = self._get_third_friday(datetime(year, month, 1))
+                if today < quarterly_expiry <= end_date:
+                    quarterly_date = quarterly_expiry.strftime("%Y%m%d")
+                    if quarterly_date not in expiries:
+                        expiries.append(quarterly_date)
+        
+        # Sort expiries by date
+        expiries.sort()
+        
+        logger.info(f"Found {len(expiries)} expiry dates (including weekly expiries): {expiries[:5]}...")
         return expiries
     
     def _get_third_friday(self, date: datetime) -> datetime:

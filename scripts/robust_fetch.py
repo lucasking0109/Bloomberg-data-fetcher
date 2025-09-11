@@ -57,7 +57,8 @@ class RobustFetcher:
                  top_n_constituents: Optional[int] = None,
                  resume: bool = False,
                  save_to_db: bool = True,
-                 export_csv: bool = False):
+                 export_csv: bool = False,
+                 export_format: str = 'auto'):
         """
         Fetch all configured data with error recovery
         
@@ -68,6 +69,7 @@ class RobustFetcher:
             resume: Resume from previous state
             save_to_db: Save to database
             export_csv: Export to CSV after completion
+            export_format: 'csv', 'parquet', or 'auto' (auto: CSV for testing ≤5, Parquet for full)
         """
         start_time = datetime.now()
         
@@ -154,7 +156,7 @@ class RobustFetcher:
             
             # Export if requested
             if export_csv and results['total_records'] > 0:
-                self._export_results()
+                self._export_results(export_format, top_n_constituents)
         
         return results
     
@@ -348,17 +350,56 @@ class RobustFetcher:
         for key, value in db_stats.items():
             print(f"  {key}: {value}")
     
-    def _export_results(self):
-        """Export results to CSV"""
+    def _export_results(self, export_format: str = 'auto', top_n_constituents: Optional[int] = None):
+        """
+        Export results with smart format selection
+        
+        Args:
+            export_format: 'csv', 'parquet', or 'auto'
+            top_n_constituents: Number of constituents being fetched (for auto format selection)
+        """
         try:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"data/bloomberg_data_{timestamp}.csv"
             
-            self.db.export_to_csv(filename)
-            print(f"\n✅ Data exported to {filename}")
+            # Auto format selection logic
+            if export_format == 'auto':
+                # Use CSV for testing (≤5 stocks) for easy inspection
+                # Use Parquet for full datasets for efficiency
+                if top_n_constituents and top_n_constituents <= 5:
+                    actual_format = 'csv'
+                    print(f"\n📋 Testing mode detected ({top_n_constituents} stocks) - using CSV format for easy inspection")
+                else:
+                    actual_format = 'parquet'
+                    print(f"\n🚀 Full dataset mode - using Parquet format for efficiency")
+            else:
+                actual_format = export_format.lower()
+            
+            # Generate filename with appropriate extension
+            if actual_format == 'csv':
+                filename = f"data/bloomberg_data_{timestamp}.csv"
+                self.db.export_to_csv(filename)
+            elif actual_format == 'parquet':
+                filename = f"data/bloomberg_data_{timestamp}.parquet"
+                self.db.export_to_parquet(filename)
+            else:
+                raise ValueError(f"Unsupported export format: {actual_format}")
+            
+            # Get file size for reporting
+            import os
+            file_size = os.path.getsize(filename) / (1024 * 1024)  # MB
+            
+            print(f"✅ Data exported to {filename}")
+            print(f"   📊 File size: {file_size:.1f} MB")
+            print(f"   📁 Format: {actual_format.upper()}")
+            
+            if actual_format == 'parquet':
+                print(f"   💡 Use pandas.read_parquet('{filename}') to load data efficiently")
+            else:
+                print(f"   💡 Use pandas.read_csv('{filename}') to load data")
             
         except Exception as e:
             logger.error(f"Error exporting data: {e}")
+            print(f"❌ Export failed: {e}")
 
 
 def main():
@@ -378,7 +419,9 @@ def main():
     parser.add_argument('--no-db', action='store_true',
                        help='Do not save to database')
     parser.add_argument('--export-csv', action='store_true',
-                       help='Export to CSV after completion')
+                       help='Export data after completion')
+    parser.add_argument('--export-format', choices=['csv', 'parquet', 'auto'], default='auto',
+                       help='Export format: csv, parquet, or auto (auto: CSV for ≤5 stocks, Parquet for full)')
     parser.add_argument('--dry-run', action='store_true',
                        help='Test run without fetching data')
     
@@ -416,7 +459,8 @@ def main():
             top_n_constituents=args.top_n,
             resume=args.resume,
             save_to_db=save_to_db,
-            export_csv=args.export_csv
+            export_csv=args.export_csv,
+            export_format=args.export_format
         )
         
         # Return appropriate exit code

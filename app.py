@@ -179,7 +179,7 @@ class BloombergFetcherApp:
         
         with col3:
             if st.button("💼 Fetch Top 5", key="fetch_top5", help="Fetch QQQ + top 5 constituents"):
-                command = "python scripts/robust_fetch.py --top-n 5 --export-csv"
+                command = "python scripts/robust_fetch.py --top-n 5 --export-csv --export-format csv"
                 self.run_fetch_command(command)
                 st.success("Started fetching top 5...")
                 time.sleep(2)
@@ -188,7 +188,7 @@ class BloombergFetcherApp:
         with col4:
             if st.button("🔥 Fetch All 20", key="fetch_all", help="Fetch QQQ + ALL 20 constituents"):
                 if st.session_state.get('confirm_all', False):
-                    command = "python scripts/robust_fetch.py --top-n 20 --export-csv"
+                    command = "python scripts/robust_fetch.py --top-n 20 --export-csv --export-format parquet"
                     self.run_fetch_command(command)
                     st.success("Started fetching all 20 constituents...")
                     st.session_state.confirm_all = False
@@ -344,16 +344,40 @@ class BloombergFetcherApp:
                 st.info("No data available yet")
         
         # Export options
-        col1, col2 = st.columns(2)
+        st.subheader("📥 Export Data")
+        
+        col1, col2, col3 = st.columns(3)
         
         with col1:
-            if st.button("📥 Export to CSV", key="export_csv"):
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filepath = f"data/export_{timestamp}.csv"
-                self.db.export_to_csv(filepath)
-                st.success(f"Exported to {filepath}")
+            export_format = st.selectbox(
+                "Format:", 
+                ["CSV", "Parquet"], 
+                help="CSV: Easy to open in Excel. Parquet: More efficient for large datasets"
+            )
         
         with col2:
+            if st.button("📥 Export Data", key="export_data"):
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                format_lower = export_format.lower()
+                filepath = f"data/export_{timestamp}.{format_lower}"
+                
+                try:
+                    if format_lower == "csv":
+                        self.db.export_to_csv(filepath)
+                    else:  # parquet
+                        self.db.export_to_parquet(filepath)
+                    
+                    file_size = Path(filepath).stat().st_size / (1024 * 1024)  # MB
+                    st.success(f"✅ Exported to {filepath}")
+                    st.info(f"📊 File size: {file_size:.1f} MB")
+                    
+                    if format_lower == "parquet":
+                        st.code(f"# Load data in Python:\nimport pandas as pd\ndf = pd.read_parquet('{filepath}')")
+                    
+                except Exception as e:
+                    st.error(f"Export failed: {e}")
+        
+        with col3:
             if st.button("🗑️ Clear Old Data (>90 days)", key="clear_old"):
                 deleted = self.db.cleanup_old_data(90)
                 st.success(f"Deleted {deleted} old records")

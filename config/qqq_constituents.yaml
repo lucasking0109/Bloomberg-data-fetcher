@@ -108,8 +108,8 @@ constituents:
 # Configuration for data fetching
 fetch_config:
   # Options configuration
-  strikes_above_atm: 20
-  strikes_below_atm: 20
+  strikes_above_atm: 40
+  strikes_below_atm: 40
   max_days_to_expiry: 60  # 2 months
   
   # Data fields to fetch for equities
