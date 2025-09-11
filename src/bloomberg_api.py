@@ -33,33 +33,54 @@ class BloombergAPI:
         self.service = None
         self.connected = False
         
-    def connect(self) -> bool:
-        """Establish connection to Bloomberg API"""
-        try:
-            # Session options
-            sessionOptions = blpapi.SessionOptions()
-            sessionOptions.setServerHost(self.host)
-            sessionOptions.setServerPort(self.port)
+    def connect(self, max_retries: int = 3, retry_delay: int = 5) -> bool:
+        """Establish connection to Bloomberg API with retry logic
+        
+        Args:
+            max_retries: Maximum number of connection attempts
+            retry_delay: Delay between retries in seconds
             
-            # Create and start session
-            self.session = blpapi.Session(sessionOptions)
-            
-            if not self.session.start():
-                logger.error("Failed to start Bloomberg session")
-                return False
+        Returns:
+            True if connected successfully
+        """
+        for attempt in range(max_retries):
+            try:
+                # Session options
+                sessionOptions = blpapi.SessionOptions()
+                sessionOptions.setServerHost(self.host)
+                sessionOptions.setServerPort(self.port)
                 
-            if not self.session.openService("//blp/refdata"):
-                logger.error("Failed to open Bloomberg service")
-                return False
+                # Create and start session
+                self.session = blpapi.Session(sessionOptions)
                 
-            self.service = self.session.getService("//blp/refdata")
-            self.connected = True
-            logger.info("Successfully connected to Bloomberg API")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Connection error: {e}")
-            return False
+                if not self.session.start():
+                    logger.error(f"Failed to start Bloomberg session (attempt {attempt + 1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        continue
+                    return False
+                    
+                if not self.session.openService("//blp/refdata"):
+                    logger.error(f"Failed to open Bloomberg service (attempt {attempt + 1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        continue
+                    return False
+                    
+                self.service = self.session.getService("//blp/refdata")
+                self.connected = True
+                logger.info("Successfully connected to Bloomberg API")
+                return True
+                
+            except Exception as e:
+                logger.error(f"Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    logger.info(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                else:
+                    return False
+        
+        return False
     
     def disconnect(self):
         """Close Bloomberg API connection"""
@@ -126,43 +147,58 @@ class BloombergAPI:
     
     def fetch_reference_data(self, 
                            tickers: List[str], 
-                           fields: List[str]) -> pd.DataFrame:
+                           fields: List[str],
+                           max_retries: int = 2) -> pd.DataFrame:
         """
-        Fetch reference data using BDP (Bloomberg Data Point)
+        Fetch reference data using BDP (Bloomberg Data Point) with retry logic
         
         Args:
             tickers: List of Bloomberg tickers
             fields: List of fields to fetch
+            max_retries: Maximum number of retry attempts
             
         Returns:
             DataFrame with reference data
         """
         if not self.connected:
             logger.error("Not connected to Bloomberg")
-            return pd.DataFrame()
+            # Try to reconnect
+            if not self.connect():
+                return pd.DataFrame()
         
-        try:
-            request = self.service.createRequest("ReferenceDataRequest")
-            
-            # Add securities
-            for ticker in tickers:
-                request.getElement("securities").appendValue(ticker)
-            
-            # Add fields
-            for field in fields:
-                request.getElement("fields").appendValue(field)
-            
-            # Send request
-            logger.info(f"Fetching reference data for {len(tickers)} tickers")
-            self.session.sendRequest(request)
-            
-            # Process response
-            data = self._process_reference_response()
-            return data
-            
-        except Exception as e:
-            logger.error(f"Error fetching reference data: {e}")
-            return pd.DataFrame()
+        for attempt in range(max_retries):
+            try:
+                request = self.service.createRequest("ReferenceDataRequest")
+                
+                # Add securities
+                for ticker in tickers:
+                    request.getElement("securities").appendValue(ticker)
+                
+                # Add fields
+                for field in fields:
+                    request.getElement("fields").appendValue(field)
+                
+                # Send request
+                logger.info(f"Fetching reference data for {len(tickers)} tickers (attempt {attempt + 1}/{max_retries})")
+                self.session.sendRequest(request)
+                
+                # Process response
+                data = self._process_reference_response()
+                
+                if not data.empty:
+                    return data
+                elif attempt < max_retries - 1:
+                    logger.warning(f"Empty response, retrying...")
+                    time.sleep(2)
+                    
+            except Exception as e:
+                logger.error(f"Error fetching reference data (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2)
+                else:
+                    return pd.DataFrame()
+        
+        return pd.DataFrame()
     
     def _process_historical_response(self) -> pd.DataFrame:
         """Process historical data response"""
@@ -312,38 +348,64 @@ class BloombergAPI:
                      tickers: List[str], 
                      fields: List[str],
                      batch_size: int = 20,
-                     delay: float = 1.0) -> pd.DataFrame:
+                     delay: float = 1.0,
+                     continue_on_error: bool = True) -> pd.DataFrame:
         """
-        Batch request to avoid hitting API limits
+        Batch request to avoid hitting API limits with error recovery
         
         Args:
             tickers: List of tickers
             fields: List of fields
             batch_size: Number of tickers per batch
             delay: Delay between batches (seconds)
+            continue_on_error: Continue processing if a batch fails
             
         Returns:
             Combined DataFrame
         """
         all_data = []
+        failed_batches = []
+        
+        total_batches = (len(tickers) - 1) // batch_size + 1
         
         for i in range(0, len(tickers), batch_size):
             batch = tickers[i:i+batch_size]
-            logger.info(f"Processing batch {i//batch_size + 1}/{(len(tickers)-1)//batch_size + 1}")
+            batch_num = i // batch_size + 1
             
-            # Fetch data for batch
-            data = self.fetch_reference_data(batch, fields)
+            logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} tickers)")
             
-            if not data.empty:
-                all_data.append(data)
+            try:
+                # Fetch data for batch
+                data = self.fetch_reference_data(batch, fields)
+                
+                if not data.empty:
+                    all_data.append(data)
+                    logger.info(f"Batch {batch_num} successful: {len(data)} records")
+                else:
+                    logger.warning(f"Batch {batch_num} returned no data")
+                    if not continue_on_error:
+                        failed_batches.append(batch_num)
+                    
+            except Exception as e:
+                logger.error(f"Batch {batch_num} failed: {e}")
+                failed_batches.append(batch_num)
+                
+                if not continue_on_error:
+                    logger.error("Stopping due to batch failure")
+                    break
             
             # Delay to avoid rate limits
             if i + batch_size < len(tickers):
                 time.sleep(delay)
         
+        if failed_batches:
+            logger.warning(f"Failed batches: {failed_batches}")
+        
         # Combine all data
         if all_data:
-            return pd.concat(all_data, ignore_index=True)
+            combined = pd.concat(all_data, ignore_index=True)
+            logger.info(f"Total records fetched: {len(combined)}")
+            return combined
         
         return pd.DataFrame()
 

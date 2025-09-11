@@ -40,7 +40,7 @@ class DatabaseManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Create options data table
+        # Create options data table with OPEN_INT explicitly included
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS options_data (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,7 +54,7 @@ class DatabaseManager:
                 ask REAL,
                 last REAL,
                 volume INTEGER,
-                open_interest INTEGER,
+                open_interest INTEGER,  -- Critical field for analysis
                 implied_vol REAL,
                 delta REAL,
                 gamma REAL,
@@ -94,6 +94,87 @@ class DatabaseManager:
                 data_points INTEGER,
                 UNIQUE(date, hour)
             )
+        """)
+        
+        # Create equity data table for constituent stocks
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS equity_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                ticker TEXT,
+                underlying TEXT,
+                px_last REAL,
+                px_open REAL,
+                px_high REAL,
+                px_low REAL,
+                px_volume INTEGER,
+                volume_avg_30d INTEGER,
+                px_bid REAL,
+                px_ask REAL,
+                chg_pct_1d REAL,
+                volatility_30d REAL,
+                cur_mkt_cap REAL,
+                pe_ratio REAL,
+                div_yield REAL,
+                fetch_date DATE,
+                UNIQUE(ticker, fetch_date)
+            )
+        """)
+        
+        # Create constituents metadata table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS constituents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT UNIQUE,
+                name TEXT,
+                weight REAL,
+                sector TEXT,
+                last_updated DATE
+            )
+        """)
+        
+        # Create constituent options table (similar to options_data but for constituents)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS constituent_options (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                ticker TEXT,
+                underlying TEXT,
+                expiry TEXT,
+                strike REAL,
+                option_type TEXT,
+                bid REAL,
+                ask REAL,
+                last REAL,
+                volume INTEGER,
+                open_interest INTEGER,  -- Critical for liquidity analysis
+                implied_vol REAL,
+                delta REAL,
+                gamma REAL,
+                theta REAL,
+                vega REAL,
+                rho REAL,
+                underlying_price REAL,
+                bid_size INTEGER,
+                ask_size INTEGER,
+                spread REAL,
+                spread_pct REAL,
+                moneyness REAL,
+                days_to_expiry INTEGER,
+                fetch_date DATE,
+                UNIQUE(ticker, fetch_date)
+            )
+        """)
+        
+        # Create indices for constituent tables
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_equity_ticker 
+            ON equity_data(underlying, fetch_date)
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_constituent_options 
+            ON constituent_options(underlying, expiry, strike)
         """)
         
         conn.commit()
