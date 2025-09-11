@@ -1,0 +1,3 @@
+bloom_env/
+*.pyc
+__pycache__/
