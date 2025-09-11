@@ -261,10 +261,15 @@ python setup_and_run.py
 
 ## 📚 Documentation
 
-- **[START_HERE.md](START_HERE.md)** - Simple user guide
+- **[QUICK_START.md](QUICK_START.md)** - 2-minute setup guide
+- **[START_HERE.md](START_HERE.md)** - Simple user guide  
+- **[AI_ASSISTANT_GUIDE.md](AI_ASSISTANT_GUIDE.md)** - AI assistant reference
 - **[CURSOR_AI_INSTRUCTIONS.md](CURSOR_AI_INSTRUCTIONS.md)** - Complete technical specs  
 - **[BLOOMBERG_SETUP.md](BLOOMBERG_SETUP.md)** - Bloomberg API installation
 - **[BLOOMBERG_API_QUICK_REFERENCE.md](BLOOMBERG_API_QUICK_REFERENCE.md)** - API usage guide
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history
+- **[DISCLAIMER.md](DISCLAIMER.md)** - Legal notices
 
 ---
 

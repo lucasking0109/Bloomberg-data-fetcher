@@ -1,3 +1,114 @@
+# Virtual environments
 bloom_env/
+venv/
+env/
+.venv/
+
+# Python cache files
 *.pyc
 __pycache__/
+*.pyo
+*.pyd
+.Python
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Database files (IMPORTANT: Real data should not be committed)
+*.db
+*.sqlite
+*.sqlite3
+
+# Data files (IMPORTANT: Real market data should not be committed)
+/data/*.csv
+/data/*.parquet  
+/data/*.xlsx
+/data/*.json
+!/data/.gitkeep
+!/data/sample_data/
+
+# Log files
+/logs/*.log
+/logs/*.out
+/logs/*.err
+!/logs/.gitkeep
+
+# Configuration with sensitive data
+config/local_config.yaml
+config/private.yaml
+.env
+.env.local
+.env.production
+
+# Bloomberg API responses (may contain sensitive data)
+bloomberg_responses/
+api_cache/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# pytest cache
+.pytest_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Windows
+*.exe
+*.msi
+
+# Personal notes and scratch files
+notes.txt
+scratch.*
+TODO.md
+personal_*
