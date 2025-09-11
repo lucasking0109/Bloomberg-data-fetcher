@@ -3,15 +3,18 @@
 ## PROJECT OVERVIEW
 This is a Bloomberg Terminal data fetcher that collects options data for QQQ index and its **TOP 20 CONSTITUENT STOCKS** (not just 5). The system fetches comprehensive options data including Open Interest (OI) and all Greeks for portfolio hedging analysis.
 
-## ⚠️ CRITICAL CONFIGURATION - FETCH ALL 20 STOCKS!
+## ⚠️ CRITICAL CONFIGURATION - UPDATED SPECIFICATIONS!
 
-### DEFAULT BEHAVIOR MUST BE:
+### DEFAULT BEHAVIOR (Updated 2025-09-10):
 ```python
-# Always fetch ALL 20 constituents, not just 5
-python scripts/robust_fetch.py --top-n 20 --export-csv
+# Full production dataset - 97,000 options records
+python scripts/robust_fetch.py --export-csv  # Defaults to 20 stocks, Parquet format
 
-# Or simply (defaults to all 20):
-python scripts/robust_fetch.py --export-csv
+# Testing subset - 5,000 options records  
+python scripts/robust_fetch.py --top-n 5 --export-csv  # Auto-uses CSV format
+
+# Or with explicit format control:
+python scripts/robust_fetch.py --export-csv --export-format parquet
 ```
 
 ### The 20 stocks configured in `config/qqq_constituents.yaml`:
@@ -36,16 +39,16 @@ python scripts/robust_fetch.py --export-csv
 19. QCOM (1.1% weight)
 20. TXN (1.0% weight)
 
-## 📊 DATA REQUIREMENTS
+## 📊 DATA REQUIREMENTS (UPDATED SPECIFICATIONS)
 
 ### For EACH Stock (QQQ + 20 constituents):
-- **Options**: ATM ± 20 strikes (40 strikes total)
-- **Expiries**: All within 2 months (60 days)
+- **Options**: ATM ± 40 strikes (80 strikes total) - EXPANDED from ±20
+- **Expiries**: All weekly + quarterly within 2 months (60 days) - QQQ has weekly expiries
 - **Critical Fields**: 
-  - OPEN_INT (Open Interest) - MUST HAVE
+  - OPEN_INT (Open Interest) - MUST HAVE for liquidity analysis
   - All Greeks (Delta, Gamma, Theta, Vega, Rho)
-  - Bid/Ask spreads
-  - Volume
+  - Bid/Ask spreads and sizes
+  - Volume (daily and average)
   - Implied Volatility
 
 ### Equity Data Fields:
@@ -159,14 +162,17 @@ python scripts/robust_fetch.py --export-csv
 python scripts/robust_fetch.py --top-n 20 --export-csv
 ```
 
-## 📊 EXPECTED OUTPUT
+## 📊 EXPECTED OUTPUT (UPDATED VOLUMES)
 
 After successful complete fetch:
-- **QQQ Options**: ~240 contracts
-- **Constituent Options**: ~24,000 contracts (20 stocks × ~1,200 each)
-- **Total Records**: ~24,240 options records
+- **QQQ Options**: ~1,000 contracts (80 strikes × ~12 weekly expiries)
+- **Constituent Options**: ~96,000 contracts (20 stocks × 80 strikes × ~60 options each)  
+- **Total Records**: ~97,000 options records (4x increase from previous spec)
 - **API Usage**: ~43,000 points (85% of daily limit)
-- **Time Required**: 20-30 minutes
+- **Time Required**: 25-30 minutes
+- **Export Formats**: 
+  - **Testing (≤5 stocks)**: CSV format (~5MB)
+  - **Production (20 stocks)**: Parquet format (~20MB, 10x faster loading)
 
 ## 🔄 ERROR RECOVERY
 
@@ -185,15 +191,21 @@ After fetch completes, verify:
 1. ✅ All 20 constituents fetched (not just 5)
 2. ✅ OPEN_INT field has data (not null)
 3. ✅ Greeks are present (Delta, Gamma, etc.)
-4. ✅ Expiries within 60 days
-5. ✅ Strikes cover ATM ± 20
+4. ✅ Expiries include weekly dates (QQQ has weekly expiries)
+5. ✅ Strikes cover ATM ± 40 (80 total per expiry)
+6. ✅ Export format matches expectation (CSV for testing, Parquet for production)
 
 Check using:
 ```python
 from src.database_manager import DatabaseManager
 db = DatabaseManager()
 stats = db.get_summary_stats()
-print(f"Total records: {stats['total_records']}")  # Should be ~24,000+
+print(f"Total records: {stats['total_records']}")  # Should be ~97,000+
+
+# Verify strike range
+import pandas as pd
+df = pd.read_parquet('data/bloomberg_data_latest.parquet')
+print(f"Strike range per ticker: {df.groupby('underlying')['strike'].agg(['min', 'max', 'count'])}")
 ```
 
 ## 🚨 BLOOMBERG TERMINAL REQUIREMENTS
@@ -248,19 +260,42 @@ python scripts/check_progress.py
 python -c "from src.database_manager import DatabaseManager; db = DatabaseManager(); db.export_to_csv('data/all_options.csv')"
 ```
 
-## 🎯 SUCCESS CRITERIA
+## 🎯 SUCCESS CRITERIA (UPDATED TARGETS)
 
 The fetch is successful when:
-1. Database has 24,000+ options records
-2. All 20 constituents are present
-3. OPEN_INT data is populated
-4. Greeks are calculated
-5. CSV export contains all data
+1. Database has 97,000+ options records (4x previous target)
+2. All 20 constituents are present (not just 5)
+3. OPEN_INT data is populated (critical for liquidity analysis)
+4. Greeks are calculated (Delta, Gamma, Theta, Vega, Rho)
+5. Strike range is ATM ± 40 (80 per expiry, not 40)
+6. QQQ has weekly expiries (not just monthly)
+7. Export format is appropriate:
+   - CSV for testing datasets (≤5 stocks)
+   - Parquet for production datasets (20 stocks)
 
-## ⭐ REMEMBER
+## ⭐ REMEMBER (UPDATED 2025-09-10)
 
-**This system is designed to fetch ALL TOP 20 QQQ CONSTITUENTS by default, not just 5. The user needs comprehensive data for portfolio hedging analysis, so always fetch the complete dataset unless explicitly told otherwise.**
+**This system is designed to fetch comprehensive options data with the following specifications:**
+
+1. **Coverage**: QQQ + ALL 20 constituents by default (not just 5)
+2. **Strikes**: ATM ± 40 (80 total per expiry) for comprehensive hedging analysis
+3. **Expiries**: All weekly + quarterly (QQQ has weekly expiries unlike typical stocks)
+4. **Format Intelligence**: 
+   - Auto-selects CSV for testing (≤5 stocks, easy inspection)
+   - Auto-selects Parquet for production (20 stocks, efficient storage/loading)
+5. **Critical Data**: Always include OPEN_INT for liquidity analysis
+6. **Volume**: Expect ~97,000 records (4x previous specification)
+
+## 💡 FOR AI ASSISTANTS
+
+When helping with this codebase:
+1. **Default to fetching ALL 20 constituents** with ATM ± 40 strikes
+2. **Use QQQ weekly expiries** (not just monthly like other stocks)
+3. **Smart format selection** based on dataset size
+4. **Always include OPEN_INT** in option fields for liquidity analysis
+5. **Use robust_fetch.py** as the main script with resume capability
+6. **Monitor API usage** to avoid Bloomberg limits (43K/50K daily)
 
 ---
 
-*This document is specifically for Cursor AI or any AI assistant reading this codebase. The primary goal is fetching options data for QQQ and ALL 20 major constituents with Open Interest and Greeks for hedging analysis.*
+*This document is specifically for AI assistants reading this codebase. The system provides comprehensive options data for QQQ and ALL 20 major constituents with Open Interest and Greeks for professional portfolio hedging analysis.*

@@ -132,14 +132,16 @@ python scripts/robust_fetch.py --resume
 
 ---
 
-## 📊 What You Get
+## 📊 What You Get (Updated Specifications)
 
 Each fetch gives you:
-- **QQQ Options**: ATM ± 20 strikes, 2 months expiry
-- **Top 20 Stocks**: AAPL, MSFT, NVDA, etc.
+- **QQQ Options**: ATM ± 40 strikes, all weekly + quarterly expiries within 2 months
+- **Top 20 Stocks**: AAPL, MSFT, NVDA, etc. (80 strikes each)
 - **All Greeks**: Delta, Gamma, Theta, Vega, Rho
 - **Open Interest**: Critical for liquidity analysis
 - **Equity Data**: Prices, volumes, PE ratios
+- **Smart Export**: CSV for testing (≤5 stocks), Parquet for production (20 stocks)
+- **Data Volume**: ~97,000 options records (4x more comprehensive)
 
 ---
 
