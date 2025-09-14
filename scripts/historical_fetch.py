@@ -25,22 +25,44 @@ def main():
     """Main execution function for historical fetch"""
     
     parser = argparse.ArgumentParser(description='Fetch historical QQQ options data')
-    parser.add_argument('--days', type=int, default=60, 
-                       help='Number of days of history to fetch')
-    parser.add_argument('--start-date', type=str, 
-                       help='Start date (YYYYMMDD)')
+    parser.add_argument('--days', type=int, default=60,
+                       help='Number of days of history to fetch (default: 60)')
+    parser.add_argument('--start-date', type=str,
+                       help='Start date (YYYYMMDD or YYYY-MM-DD)')
     parser.add_argument('--end-date', type=str,
-                       help='End date (YYYYMMDD)')
+                       help='End date (YYYYMMDD or YYYY-MM-DD)')
     parser.add_argument('--config', default='config/config.yaml',
                        help='Path to configuration file')
-    parser.add_argument('--save-db', action='store_true',
-                       help='Save to database')
+    parser.add_argument('--save-db', action='store_true', default=True,
+                       help='Save to database (default: True)')
+    parser.add_argument('--export-format', choices=['csv', 'parquet', 'excel'], default='parquet',
+                       help='Export format (default: parquet for historical data)')
+    parser.add_argument('--quick-test', action='store_true',
+                       help='Quick test mode - fetch only 1 week, 5 near-ATM strikes')
+    parser.add_argument('--atm-only', action='store_true',
+                       help='Fetch only at-the-money strikes (faster)')
+    parser.add_argument('--no-export', action='store_true',
+                       help='Skip file export, only save to database')
     args = parser.parse_args()
     
-    # Calculate date range
+    # Handle quick test mode
+    if args.quick_test:
+        print("🧪 Quick test mode enabled - fetching 1 week of data with limited strikes")
+        args.days = 7
+        args.atm_only = True
+        if not args.export_format:
+            args.export_format = 'csv'
+
+    # Calculate date range with flexible date format support
+    def parse_date(date_str):
+        """Parse date from YYYYMMDD or YYYY-MM-DD format"""
+        if '-' in date_str:
+            return datetime.strptime(date_str, '%Y-%m-%d').strftime('%Y%m%d')
+        return date_str
+
     if args.start_date and args.end_date:
-        start_date = args.start_date
-        end_date = args.end_date
+        start_date = parse_date(args.start_date)
+        end_date = parse_date(args.end_date)
     else:
         end_date = datetime.now().strftime('%Y%m%d')
         start_date = (datetime.now() - timedelta(days=args.days)).strftime('%Y%m%d')
@@ -77,45 +99,93 @@ def main():
             if response.lower() != 'y':
                 return 1
         
-        # Fetch historical data
+        # Fetch historical data with options
         logger.info("Fetching historical options data...")
+
+        # Modify fetcher for ATM-only mode
+        if args.atm_only:
+            logger.info("ATM-only mode: limiting to 5 strikes around current price")
+            # This will be handled in the fetch_historical_options method
+
         data = fetcher.fetch_historical_options(start_date, end_date)
-        
+
         if data.empty:
             logger.warning("No data fetched")
             return 1
-        
+
         logger.info(f"Fetched {len(data)} historical records")
-        
+
         # Process data
         processed_data = fetcher.processor.validate_data(data)
         logger.info(f"Validated {len(processed_data)} records")
-        
+
         # Save to database if requested
         if args.save_db:
             logger.info("Saving to database...")
             db = DatabaseManager()
             records_saved = db.save_options_data(processed_data)
             logger.info(f"Saved {records_saved} records to database")
+
+        # Export to file unless --no-export is specified
+        if not args.no_export:
+            # Temporarily set the output format in config
+            original_format = fetcher.config.get('output', {}).get('format', 'csv')
+            if 'output' not in fetcher.config:
+                fetcher.config['output'] = {}
+            fetcher.config['output']['format'] = args.export_format
+
+            # Export with intelligent naming
+            filepath = fetcher.save_data(processed_data, suffix="_historical")
+            logger.info(f"Exported to {filepath}")
+
+            # Restore original format
+            fetcher.config['output']['format'] = original_format
+        else:
+            logger.info("Skipping file export as requested")
+            filepath = None
         
-        # Save to file
-        filepath = fetcher.save_data(processed_data, suffix="_historical")
-        logger.info(f"Exported to {filepath}")
-        
-        # Show summary
-        print("\n" + "="*60)
-        print("HISTORICAL FETCH SUMMARY")
-        print("="*60)
-        print(f"Date Range: {start_date} to {end_date}")
-        print(f"Records Fetched: {len(data)}")
-        print(f"Records Validated: {len(processed_data)}")
-        
+        # Show enhanced summary
+        print("\n" + "="*70)
+        print("🎯 HISTORICAL FETCH SUMMARY")
+        print("="*70)
+
+        # Format dates for display
+        start_display = datetime.strptime(start_date, '%Y%m%d').strftime('%Y-%m-%d')
+        end_display = datetime.strptime(end_date, '%Y%m%d').strftime('%Y-%m-%d')
+
+        print(f"📅 Date Range: {start_display} to {end_display}")
+        print(f"📊 Records Fetched: {len(data):,}")
+        print(f"✅ Records Validated: {len(processed_data):,}")
+
         if not processed_data.empty:
-            print(f"Unique Dates: {processed_data['fetch_time'].dt.date.nunique()}")
-            print(f"Unique Strikes: {processed_data['strike'].nunique()}")
-            print(f"Unique Expiries: {processed_data['expiry'].nunique()}")
-        
-        print("="*60)
+            print(f"📈 Unique Trading Days: {processed_data['fetch_time'].dt.date.nunique()}")
+            print(f"🎯 Unique Strikes: {processed_data['strike'].nunique()}")
+            print(f"📅 Unique Expiries: {processed_data['expiry'].nunique()}")
+
+            # Show data range
+            min_strike = processed_data['strike'].min()
+            max_strike = processed_data['strike'].max()
+            print(f"💰 Strike Range: ${min_strike:.0f} - ${max_strike:.0f}")
+
+            # Show expiry range
+            expiries = processed_data['expiry'].unique()
+            if len(expiries) > 0:
+                print(f"⏰ Expiry Range: {min(expiries)} to {max(expiries)}")
+
+        if filepath:
+            import os
+            file_size = os.path.getsize(filepath) / (1024 * 1024)  # MB
+            print(f"💾 Export File: {filepath}")
+            print(f"📁 File Size: {file_size:.1f} MB")
+            print(f"📝 Format: {args.export_format.upper()}")
+
+            # Loading instructions
+            if args.export_format == 'parquet':
+                print(f"💡 Load with: df = pd.read_parquet('{filepath}')")
+            elif args.export_format == 'csv':
+                print(f"💡 Load with: df = pd.read_csv('{filepath}')")
+
+        print("="*70)
         
         # Show usage report
         fetcher.monitor.print_usage_report()

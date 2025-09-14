@@ -387,17 +387,19 @@ class DatabaseManager:
         logger.info(f"Deleted {deleted} old records")
         return deleted
     
-    def export_to_csv(self, 
-                     output_path: str,
+    def export_to_csv(self,
+                     output_path: Optional[str] = None,
                      start_date: Optional[str] = None,
-                     end_date: Optional[str] = None):
+                     end_date: Optional[str] = None,
+                     scope: str = 'all'):
         """
-        Export data to CSV file
-        
+        Export data to CSV file with intelligent naming
+
         Args:
-            output_path: Output CSV file path
+            output_path: Output CSV file path (auto-generated if None)
             start_date: Optional start date filter
             end_date: Optional end date filter
+            scope: 'qqq_only', 'top5', 'all20', or 'all' for filename generation
         """
         conn = sqlite3.connect(self.db_path)
         
@@ -412,21 +414,28 @@ class DatabaseManager:
         
         df = pd.read_sql_query(query, conn, params=params if params else None)
         conn.close()
-        
+
+        # Generate intelligent filename if not provided
+        if output_path is None:
+            output_path = self._generate_filename('csv', scope, df)
+
         df.to_csv(output_path, index=False)
         logger.info(f"Exported {len(df)} records to {output_path}")
+        return output_path
     
-    def export_to_parquet(self, 
-                         output_path: str,
+    def export_to_parquet(self,
+                         output_path: Optional[str] = None,
                          start_date: Optional[str] = None,
-                         end_date: Optional[str] = None):
+                         end_date: Optional[str] = None,
+                         scope: str = 'all'):
         """
         Export data to Parquet file for efficient storage and fast access
-        
+
         Args:
-            output_path: Output Parquet file path
+            output_path: Output Parquet file path (auto-generated if None)
             start_date: Optional start date filter
             end_date: Optional end date filter
+            scope: 'qqq_only', 'top5', 'all20', or 'all' for filename generation
         """
         conn = sqlite3.connect(self.db_path)
         
@@ -450,9 +459,56 @@ class DatabaseManager:
         if 'expiry' in df.columns:
             df['expiry'] = pd.to_datetime(df['expiry'], format='%Y%m%d')
         
+        # Generate intelligent filename if not provided
+        if output_path is None:
+            output_path = self._generate_filename('parquet', scope, df)
+
         df.to_parquet(output_path, index=False, compression='snappy')
         logger.info(f"Exported {len(df)} records to {output_path} (Parquet format)")
-    
+        return output_path
+
+    def _generate_filename(self, format_type: str, scope: str, df: pd.DataFrame) -> str:
+        """
+        Generate intelligent filename based on data content
+
+        Args:
+            format_type: 'csv' or 'parquet'
+            scope: 'qqq_only', 'top5', 'all20', or 'all'
+            df: DataFrame to analyze for content
+
+        Returns:
+            Generated filename path
+        """
+        from datetime import datetime
+
+        # Get current date for filename
+        today = datetime.now().strftime('%Y-%m-%d')
+
+        # Analyze data content to determine actual scope if 'all'
+        if scope == 'all' and not df.empty:
+            unique_underlyings = set(df['underlying'].unique()) if 'underlying' in df.columns else set()
+
+            if len(unique_underlyings) == 1 and 'QQQ' in unique_underlyings:
+                scope = 'qqq_only'
+            elif len(unique_underlyings) <= 6:  # QQQ + 5 constituents
+                scope = 'top5'
+            elif len(unique_underlyings) >= 15:  # QQQ + most/all constituents
+                scope = 'all20'
+
+        # Generate filename based on scope
+        if scope == 'qqq_only':
+            filename = f"data/QQQ_options_{today}.{format_type}"
+        elif scope == 'top5':
+            filename = f"data/QQQ_top5_options_{today}.{format_type}"
+        elif scope == 'all20':
+            filename = f"data/QQQ_all20_options_{today}.{format_type}"
+        else:
+            # Fallback to timestamp-based naming
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"data/bloomberg_options_{timestamp}.{format_type}"
+
+        return filename
+
     def export_constituent_options(self,
                                   output_path: str,
                                   format_type: str = 'parquet',

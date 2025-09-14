@@ -36,8 +36,6 @@ python setup_and_run.py
 
 ## 🖥️ Web Interface Features
 
-![Dashboard Preview](https://via.placeholder.com/800x400/1f1f1f/ffffff?text=Bloomberg+QQQ+Fetcher+Dashboard)
-
 ### 🔥 One-Click Operations
 - **Test Connection** - Verify Bloomberg Terminal access
 - **Fetch Top 5** - Quick test (5 min, CSV export)  

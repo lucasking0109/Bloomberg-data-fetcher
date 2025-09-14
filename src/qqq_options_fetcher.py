@@ -415,33 +415,55 @@ class QQQOptionsFetcher:
         return pd.DataFrame()
     
     def save_data(self, df: pd.DataFrame, suffix: str = ""):
-        """Save data to file"""
+        """Save data to file with intelligent naming for historical data"""
         config = self.config.get('output', {})
         output_path = config.get('path', './data/')
         output_format = config.get('format', 'csv')
-        
+
         # Create directory if not exists
         os.makedirs(output_path, exist_ok=True)
-        
-        # Generate filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"qqq_options_{timestamp}{suffix}"
-        
+
+        # Generate intelligent filename for historical data
+        if "_historical" in suffix and not df.empty:
+            # Extract date range from historical data
+            today = datetime.now().strftime("%Y-%m-%d")
+
+            # Try to extract date range from data
+            if 'fetch_time' in df.columns:
+                dates = pd.to_datetime(df['fetch_time']).dt.date
+                start_date = dates.min().strftime("%Y-%m-%d")
+                end_date = dates.max().strftime("%Y-%m-%d")
+
+                if start_date == end_date:
+                    filename = f"QQQ_options_historical_{start_date}"
+                else:
+                    filename = f"QQQ_options_historical_{start_date}_to_{end_date}"
+            else:
+                filename = f"QQQ_options_historical_{today}"
+        else:
+            # Use existing logic for current data
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"qqq_options_{timestamp}{suffix}"
+
         if output_format == 'csv':
             filepath = os.path.join(output_path, f"{filename}.csv")
             df.to_csv(filepath, index=False)
             logger.info(f"Data saved to {filepath}")
-        
+
         elif output_format == 'parquet':
             filepath = os.path.join(output_path, f"{filename}.parquet")
-            df.to_parquet(filepath, index=False)
+            # Convert datetime columns for better Parquet compression
+            df_copy = df.copy()
+            if 'fetch_time' in df_copy.columns:
+                df_copy['fetch_time'] = pd.to_datetime(df_copy['fetch_time'])
+            df_copy.to_parquet(filepath, index=False, compression='snappy')
             logger.info(f"Data saved to {filepath}")
-        
+
         elif output_format == 'excel':
             filepath = os.path.join(output_path, f"{filename}.xlsx")
             df.to_excel(filepath, index=False)
             logger.info(f"Data saved to {filepath}")
-        
+
         return filepath
     
     def run(self):

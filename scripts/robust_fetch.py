@@ -359,8 +359,6 @@ class RobustFetcher:
             top_n_constituents: Number of constituents being fetched (for auto format selection)
         """
         try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            
             # Auto format selection logic
             if export_format == 'auto':
                 # Use CSV for testing (≤5 stocks) for easy inspection
@@ -373,14 +371,22 @@ class RobustFetcher:
                     print(f"\n🚀 Full dataset mode - using Parquet format for efficiency")
             else:
                 actual_format = export_format.lower()
-            
-            # Generate filename with appropriate extension
+
+            # Determine scope for intelligent filename generation
+            if top_n_constituents is None or top_n_constituents == 0:
+                scope = 'qqq_only'
+            elif top_n_constituents <= 5:
+                scope = 'top5'
+            elif top_n_constituents >= 15:
+                scope = 'all20'
+            else:
+                scope = 'all'
+
+            # Export with intelligent filename generation
             if actual_format == 'csv':
-                filename = f"data/bloomberg_data_{timestamp}.csv"
-                self.db.export_to_csv(filename)
+                filename = self.db.export_to_csv(scope=scope)
             elif actual_format == 'parquet':
-                filename = f"data/bloomberg_data_{timestamp}.parquet"
-                self.db.export_to_parquet(filename)
+                filename = self.db.export_to_parquet(scope=scope)
             else:
                 raise ValueError(f"Unsupported export format: {actual_format}")
             

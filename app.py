@@ -357,23 +357,22 @@ class BloombergFetcherApp:
         
         with col2:
             if st.button("📥 Export Data", key="export_data"):
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 format_lower = export_format.lower()
-                filepath = f"data/export_{timestamp}.{format_lower}"
-                
+
                 try:
+                    # Let database manager auto-generate intelligent filename
                     if format_lower == "csv":
-                        self.db.export_to_csv(filepath)
+                        filepath = self.db.export_to_csv(scope='all')
                     else:  # parquet
-                        self.db.export_to_parquet(filepath)
-                    
+                        filepath = self.db.export_to_parquet(scope='all')
+
                     file_size = Path(filepath).stat().st_size / (1024 * 1024)  # MB
                     st.success(f"✅ Exported to {filepath}")
                     st.info(f"📊 File size: {file_size:.1f} MB")
-                    
+
                     if format_lower == "parquet":
                         st.code(f"# Load data in Python:\nimport pandas as pd\ndf = pd.read_parquet('{filepath}')")
-                    
+
                 except Exception as e:
                     st.error(f"Export failed: {e}")
         
