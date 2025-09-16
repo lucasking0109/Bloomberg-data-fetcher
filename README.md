@@ -24,13 +24,21 @@ Fetches comprehensive options data for **portfolio hedging analysis**:
 # 1. Clone and setup
 git clone https://github.com/lucasking0109/bloomberg-qqq-fetcher.git
 cd bloomberg-qqq-fetcher
-python setup_and_run.py
+python setup_bloomberg_terminal.py
 
-# 2. Click "🔥 Fetch All 20" in the web interface
-# That's it! Data saved to bloomberg_options.db + exported as Parquet
+# 2. Run the application
+python scripts\historical_fetch.py --quick-test
+# Or use: run_bloomberg_fetcher.bat (Windows)
 ```
 
-**Time Required**: 25-30 minutes for complete dataset
+**Time Required**: 5 minutes setup, 25-30 minutes for complete dataset
+
+### 🎯 **即插即用 (Plug & Play)**
+
+**Bloomberg Terminal 用戶：**
+1. **下載專案** → 雙擊 `run_bloomberg_fetcher.bat`
+2. **自動安裝** → 選擇功能執行
+3. **完成！** 無需手動配置
 
 ---
 
