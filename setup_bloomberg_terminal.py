@@ -217,9 +217,9 @@ $env:PATH += ";$(Get-Location)"
 $env:PYTHONPATH = Get-Location
 
 # Test import
-python -c "import blpapi; print('✅ Bloomberg API ready')" 2>$null
+python -c "import blpapi; print('OK Bloomberg API ready')" 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Bloomberg API not properly installed" -ForegroundColor Red
+    Write-Host "ERROR Bloomberg API not properly installed" -ForegroundColor Red
     Write-Host "Run: python setup_bloomberg_terminal.py" -ForegroundColor Yellow
     exit
 }
@@ -233,7 +233,7 @@ Write-Host ""
 """
 
         ps1_file = self.current_dir / "run_bloomberg_fetcher.ps1"
-        ps1_file.write_text(ps1_content)
+        ps1_file.write_text(ps1_content, encoding='utf-8')
         print(f"✅ Created: {ps1_file.name}")
 
         return True
