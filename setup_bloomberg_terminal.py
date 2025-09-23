@@ -28,7 +28,7 @@ class BloombergSetup:
         self.print_header("Checking Python Environment")
 
         version = sys.version_info
-        print(f"✅ Python version: {version.major}.{version.minor}.{version.patch}")
+        print(f"✅ Python version: {version.major}.{version.minor}.{version.micro}")
 
         if version.major < 3 or (version.major == 3 and version.minor < 6):
             print("❌ ERROR: Python 3.6+ required")
