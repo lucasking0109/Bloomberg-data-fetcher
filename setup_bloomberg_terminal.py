@@ -100,31 +100,103 @@ class BloombergSetup:
             return False
 
     def setup_dll(self):
-        """Setup Bloomberg DLL file"""
+        """Setup Bloomberg DLL file with multiple fallback methods"""
         self.print_header("Setting up Bloomberg DLL")
 
         dll_file = self.current_dir / "blpapi3_64.dll"
         if not dll_file.exists():
             print("❌ ERROR: blpapi3_64.dll not found")
+            print("   Please ensure blpapi3_64.dll is in the project directory")
             return False
 
         print(f"✅ Found DLL: {dll_file}")
 
+        # Get DLL size for verification
+        dll_size = dll_file.stat().st_size / (1024 * 1024)  # Convert to MB
+        print(f"   DLL size: {dll_size:.1f} MB")
+
+        success_count = 0
+
         # Method 1: Copy to Python directory
         python_dll = self.python_dir / "blpapi3_64.dll"
         try:
-            print(f"📋 Copying DLL to Python directory: {self.python_dir}")
+            print(f"📋 Method 1: Copying to Python directory: {self.python_dir}")
             shutil.copy2(dll_file, python_dll)
             print("✅ DLL copied to Python directory")
+            success_count += 1
         except Exception as e:
-            print(f"⚠️  Could not copy to Python directory: {e}")
-            print("   Will use PATH method instead")
+            print(f"⚠️  Method 1 failed: {e}")
 
-        # Method 2: Add to PATH (for current session)
+        # Method 2: Copy to Scripts directory
+        scripts_dir = self.python_dir / "Scripts"
+        if scripts_dir.exists():
+            try:
+                scripts_dll = scripts_dir / "blpapi3_64.dll"
+                print(f"📋 Method 2: Copying to Scripts directory: {scripts_dir}")
+                shutil.copy2(dll_file, scripts_dll)
+                print("✅ DLL copied to Scripts directory")
+                success_count += 1
+            except Exception as e:
+                print(f"⚠️  Method 2 failed: {e}")
+
+        # Method 3: Copy to site-packages directory
+        try:
+            import site
+            site_packages = Path(site.getusersitepackages()) if hasattr(site, 'getusersitepackages') else None
+            if site_packages and site_packages.exists():
+                site_dll = site_packages / "blpapi3_64.dll"
+                print(f"📋 Method 3: Copying to site-packages: {site_packages}")
+                shutil.copy2(dll_file, site_dll)
+                print("✅ DLL copied to site-packages directory")
+                success_count += 1
+        except Exception as e:
+            print(f"⚠️  Method 3 failed: {e}")
+
+        # Method 4: Try System32 directory (requires admin)
+        if self.is_windows:
+            try:
+                import os
+                system32 = Path(os.environ.get('WINDIR', 'C:\\Windows')) / "System32"
+                if system32.exists():
+                    system32_dll = system32 / "blpapi3_64.dll"
+                    print(f"📋 Method 4: Copying to System32: {system32}")
+                    shutil.copy2(dll_file, system32_dll)
+                    print("✅ DLL copied to System32 directory")
+                    success_count += 1
+            except Exception as e:
+                print(f"⚠️  Method 4 failed (may need admin rights): {e}")
+
+        # Method 5: Add to PATH (for current session)
         os.environ['PATH'] = str(self.current_dir) + os.pathsep + os.environ.get('PATH', '')
         print(f"✅ Added {self.current_dir} to PATH")
 
-        return True
+        # Method 6: Check common Bloomberg installation paths
+        bloomberg_paths = [
+            "C:\\blp\\DAPI",
+            "C:\\Program Files (x86)\\blp\\DAPI",
+            "C:\\Program Files\\Bloomberg\\blp\\DAPI"
+        ]
+
+        for bloomberg_path in bloomberg_paths:
+            try:
+                path_obj = Path(bloomberg_path)
+                if path_obj.exists():
+                    bloomberg_dll = path_obj / "blpapi3_64.dll"
+                    print(f"📋 Method 6: Copying to Bloomberg path: {bloomberg_path}")
+                    shutil.copy2(dll_file, bloomberg_dll)
+                    print(f"✅ DLL copied to Bloomberg directory: {bloomberg_path}")
+                    success_count += 1
+                    # Add to PATH too
+                    os.environ['PATH'] = bloomberg_path + os.pathsep + os.environ.get('PATH', '')
+                    break
+            except Exception as e:
+                print(f"⚠️  Bloomberg path {bloomberg_path} failed: {e}")
+
+        print(f"\n📊 DLL Setup Summary:")
+        print(f"   Successful installations: {success_count}")
+        print(f"   Current PATH includes project directory: ✅")
+
+        return success_count > 0
 
     def test_import(self):
         """Test if blpapi can be imported"""

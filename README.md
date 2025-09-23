@@ -180,20 +180,28 @@ option_fields:
 
 ## 🔧 System Requirements
 
-### **Bloomberg Terminal**
-- ✅ Terminal running and logged in
-- ✅ API enabled (type `WAPI<GO>` to check)
-- ✅ Python API installed (included in repo)
+### **🏢 Bloomberg Terminal (REQUIRED)**
+- ✅ **Valid Bloomberg Terminal subscription** (CRITICAL!)
+- ✅ Terminal running and logged in on the same machine
+- ✅ API access enabled on your account
+- ✅ Use `API<GO>` (not `WAPI<GO>` - retired in 2024)
+- ⚠️  **This is NOT a free API** - requires paid Bloomberg subscription
 
-### **Python Environment**
-- Python 3.8+ 
-- Dependencies auto-installed by `setup_and_run.py`
-- ~200MB for virtual environment
+### **💻 Python Environment**
+- Python 3.8+ (64-bit REQUIRED for Bloomberg API)
+- Dependencies auto-installed by `setup_bloomberg_terminal.py`
+- ~200MB for dependencies
 
-### **Hardware**
+### **🖥️ Hardware**
 - 4GB+ RAM (for large datasets)
 - 1GB disk space (for data storage)
+- Windows 10/11 (Bloomberg Terminal compatibility)
 - Stable internet connection
+
+### **🔐 Account Requirements**
+- Bloomberg Terminal user credentials
+- API access permissions (contact Bloomberg if needed)
+- Active subscription that includes API functionality
 
 ---
 
@@ -216,25 +224,58 @@ option_fields:
 
 ## 🆘 Troubleshooting
 
-### **Bloomberg Connection Issues**
+### **🔍 First Step: Run Diagnostics**
 ```bash
-# Check API status
-python -c "from src.bloomberg_api import test_connection; test_connection()"
+# Comprehensive system check
+python bloomberg_diagnostics.py
 
-# Reinstall API
-pip install blpapi-3.25.3-py3-none-win_amd64.whl
+# Quick setup attempt
+python setup_bloomberg_terminal.py
 ```
 
-### **Interrupted Fetches**
+### **📋 Bloomberg Connection Issues**
+```bash
+# Common Issues:
+# 1. Terminal not running: Start Bloomberg Terminal and log in
+# 2. WAPI retired: Use API<GO> instead of WAPI<GO>
+# 3. DLL not found: Run python setup_bloomberg_terminal.py
+
+# Manual fix if automatic fails:
+# See MANUAL_FIX_GUIDE.md for step-by-step instructions
+```
+
+### **🔧 File Not Found Errors**
+```bash
+# Error: FileNotFoundError: blpapi3_64.dll
+# Solution 1: Automatic fix
+python setup_bloomberg_terminal.py
+
+# Solution 2: Manual fix (as Administrator)
+copy blpapi3_64.dll "C:\Users\{username}\AppData\Local\Programs\Python\Python313\"
+
+# Solution 3: Check Bloomberg Terminal is running
+# In Terminal: API<GO> → Download Python API
+```
+
+### **🚫 Access Denied / Not Authorized**
+```
+Contact Bloomberg Support:
+- Verify your account has API access
+- Check subscription includes API functionality
+- Request API permissions activation
+- Ensure you're logged into Terminal on the same machine
+```
+
+### **⏸️ Interrupted Fetches**
 ```bash
 # Resume from where it stopped
-python scripts/robust_fetch.py --resume
+python scripts/historical_fetch.py --resume
 
 # Check progress
-python scripts/check_progress.py
+python bloomberg_diagnostics.py
 ```
 
-### **Data Validation**
+### **📊 Data Validation**
 ```python
 from src.database_manager import DatabaseManager
 db = DatabaseManager()
