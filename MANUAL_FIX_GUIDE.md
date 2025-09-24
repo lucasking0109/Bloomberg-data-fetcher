@@ -21,44 +21,47 @@ python bloomberg_diagnostics.py
 - ✅ DLL檔案位置
 - ✅ API連接狀態
 
-## 🛠️ **手動修復步驟**
+## 🛠️ **手動修復步驟 (2024更新)**
 
-### **步驟1：確保Bloomberg Terminal運行**
-
-1. **啟動Bloomberg Terminal**
-2. **完成登入** - 確保看到Terminal主畫面
-3. **檢查API狀態** - 在Terminal輸入: `API<GO>`
-
-### **步驟2：手動複製DLL檔案**
-
-**以管理員身份開啟命令提示字元**，然後執行：
+### **步驟1：使用Bloomberg官方pip倉庫 (推薦)**
 
 ```cmd
-# 方法1：複製到Python目錄
-copy "blpapi3_64.dll" "C:\Users\cchunan\AppData\Local\Programs\Python\Python313\"
-
-# 方法2：複製到Scripts目錄
-copy "blpapi3_64.dll" "C:\Users\cchunan\AppData\Local\Programs\Python\Python313\Scripts\"
-
-# 方法3：複製到System32 (需要管理員權限)
-copy "blpapi3_64.dll" "C:\Windows\System32\"
-```
-
-**替換路徑說明：**
-- 將 `cchunan` 替換為你的用戶名
-- 將 `Python313` 替換為你的Python版本
-
-### **步驟3：安裝Python套件**
-
-```cmd
-# 先解除安裝舊版本
-pip uninstall blpapi -y
-
-# 安裝新版本
-pip install blpapi-3.25.3-py3-none-win_amd64.whl --user
+# 官方方法 - 不需要手動下載檔案
+python -m pip install --index-url=https://blpapi.bloomberg.com/repository/releases/python/simple/ blpapi --user
 
 # 驗證安裝
 python -c "import blpapi; print('Success!')"
+```
+
+### **步驟2：確保Bloomberg Terminal運行**
+
+1. **啟動Bloomberg Terminal**
+2. **完成登入** - 確保看到Terminal主畫面
+3. **檢查API狀態** - 在Terminal輸入: `API<GO>` (不是WAPI<GO>)
+
+### **步驟3：設定環境變數**
+
+```cmd
+# 設定必要的環境變數
+set BLPAPI_ROOT=%CD%
+set PATH=%PATH%;%CD%
+set PYTHONPATH=%PYTHONPATH%;%CD%
+
+# 測試連接
+python -c "import blpapi; session = blpapi.Session(); print('Success!' if session.start() else 'Failed'); session.stop() if 'session' in locals() else None"
+```
+
+### **步驟4：如果官方方法失敗，使用備用方法**
+
+```cmd
+# 解除安裝舊版本
+pip uninstall blpapi -y
+
+# 使用我們的自動化設置
+python bloomberg_official_setup.py
+
+# 或者使用增強設置 (包含DLL處理)
+python setup_bloomberg_terminal.py
 ```
 
 ### **步驟4：測試連接**

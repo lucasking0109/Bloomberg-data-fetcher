@@ -5,33 +5,41 @@ The old `WAPI<GO>` command has been **RETIRED** by Bloomberg. Use the new method
 
 ## 🎯 Current Installation Methods (2025)
 
-### Method 1: Bloomberg Developer Portal (Recommended)
-```
-1. Go to: https://www.bloomberg.com/professional/support/api-library/
-2. Login with your Bloomberg Terminal credentials
-3. Download "Python API Library" (blpapi v3.25.3+)
-4. Run installer as Administrator
-5. Select Python installation path: C:\Users\{username}\AppData\Local\Programs\Python\Python313\
-6. Verify installation: python -c "import blpapi; print('Success!')"
+### Method 1: Official Pip Installation (Recommended - 2024)
+```bash
+# Bloomberg's official pip repository (NO manual downloads needed)
+python -m pip install --index-url=https://blpapi.bloomberg.com/repository/releases/python/simple/ blpapi
+
+# Verify installation
+python -c "import blpapi; print('Success!')"
 ```
 
-### Method 2: Bloomberg Terminal (New Command)
+### Method 2: Our Automated Setup (Easiest)
+```bash
+# Run our official setup script
+python bloomberg_official_setup.py
+
+# Or use Windows GUI
+quick_setup.bat
+```
+
+### Method 3: Bloomberg Terminal (Legacy - Only if pip fails)
 ```
 1. Open Bloomberg Terminal and log in
 2. Type: API<GO> (NOT the old WAPI<GO>)
 3. Navigate to "API Library" section
 4. Select "Python API" for your platform
-5. Download and run installer as Administrator
+5. Download wheel and DLL files
+6. Use our setup script: python setup_bloomberg_terminal.py
 ```
 
-### Method 3: Manual Installation (If automatic fails)
+### Method 4: Manual Installation (Last resort)
 ```
-1. Ensure you have the following files:
-   - blpapi-3.25.3-py3-none-win_amd64.whl
-   - blpapi3_64.dll
-2. Run: pip install blpapi-3.25.3-py3-none-win_amd64.whl --user
-3. Copy blpapi3_64.dll to Python directory
-4. Run: python bloomberg_diagnostics.py (to verify)
+# Only if all other methods fail
+1. Download from Bloomberg Terminal: API<GO>
+2. Install wheel: pip install blpapi-*.whl --user
+3. Run diagnostics: python bloomberg_diagnostics.py
+4. Follow manual fix guide: MANUAL_FIX_GUIDE.md
 ```
 
 ### Method 4: Account Verification

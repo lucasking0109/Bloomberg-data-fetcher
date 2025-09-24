@@ -67,9 +67,37 @@ class BloombergSetup:
             print(f"❌ ERROR installing dependencies: {e}")
             return False
 
-    def install_blpapi(self):
-        """Install Bloomberg Python API"""
-        self.print_header("Installing Bloomberg API (blpapi)")
+    def install_blpapi_official(self):
+        """Install Bloomberg API using official pip repository (preferred method)"""
+        self.print_header("Installing Bloomberg API (Official Method)")
+
+        bloomberg_index = "https://blpapi.bloomberg.com/repository/releases/python/simple/"
+        print(f"📦 Using Bloomberg's official repository: {bloomberg_index}")
+
+        try:
+            # Uninstall old version if exists
+            print("🔧 Removing old blpapi if exists...")
+            subprocess.run([sys.executable, "-m", "pip", "uninstall", "blpapi", "-y"],
+                         capture_output=True)
+
+            # Install from official repository
+            print("📦 Installing blpapi from Bloomberg's official repository...")
+            subprocess.check_call([
+                sys.executable, "-m", "pip", "install",
+                "--index-url", bloomberg_index,
+                "blpapi", "--user"
+            ])
+            print("✅ Bloomberg API installed successfully from official repository!")
+            return True
+
+        except subprocess.CalledProcessError as e:
+            print(f"⚠️  Official installation failed: {e}")
+            print("   Falling back to local wheel method...")
+            return False
+
+    def install_blpapi_wheel(self):
+        """Install Bloomberg Python API from local wheel file (fallback method)"""
+        self.print_header("Installing Bloomberg API (Local Wheel Method)")
 
         # Check if blpapi wheel exists
         wheel_file = None
@@ -80,20 +108,17 @@ class BloombergSetup:
         if not wheel_file:
             print("❌ ERROR: blpapi wheel file not found")
             print("   Looking for: blpapi-3.25.3-py3-none-win_amd64.whl")
+            print("   Download from: Bloomberg Terminal API<GO> or")
+            print("   https://www.bloomberg.com/professional/support/api-library/")
             return False
 
         print(f"📦 Found wheel file: {wheel_file.name}")
 
         try:
-            # Uninstall old version if exists
-            print("🔧 Removing old blpapi if exists...")
-            subprocess.run([sys.executable, "-m", "pip", "uninstall", "blpapi", "-y"],
-                         capture_output=True)
-
-            # Install new version
+            # Install wheel
             print(f"📦 Installing {wheel_file.name}...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", str(wheel_file), "--user"])
-            print("✅ blpapi installed successfully")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", str(wheel_file), "--user", "--force-reinstall"])
+            print("✅ blpapi installed successfully from wheel")
             return True
         except subprocess.CalledProcessError as e:
             print(f"❌ ERROR installing blpapi: {e}")
@@ -310,14 +335,35 @@ Write-Host ""
 
         return True
 
+    def setup_environment_variables(self):
+        """Setup Bloomberg environment variables"""
+        self.print_header("Setting up Environment Variables")
+
+        # Set BLPAPI_ROOT to current directory
+        os.environ['BLPAPI_ROOT'] = str(self.current_dir)
+        print(f"✅ Set BLPAPI_ROOT = {self.current_dir}")
+
+        # Add current directory to PATH
+        current_path = os.environ.get('PATH', '')
+        if str(self.current_dir) not in current_path:
+            os.environ['PATH'] = str(self.current_dir) + os.pathsep + current_path
+            print(f"✅ Added {self.current_dir} to PATH")
+
+        return True
+
     def run(self):
-        """Run complete setup"""
+        """Run complete setup with official method preferred"""
         print("\n" + "🚀" * 30)
         print("  BLOOMBERG QQQ FETCHER - AUTOMATIC SETUP")
         print("🚀" * 30)
+        print("  Using Bloomberg's official installation methods")
 
         # Check Python
         if not self.check_python_version():
+            return False
+
+        # Setup environment variables
+        if not self.setup_environment_variables():
             return False
 
         # Install requirements
@@ -325,18 +371,31 @@ Write-Host ""
             print("\n⚠️  Failed to install some dependencies")
             print("   You may need to install them manually")
 
-        # Install blpapi
-        if not self.install_blpapi():
-            return False
+        # Try official Bloomberg installation first
+        blpapi_success = self.install_blpapi_official()
 
-        # Setup DLL
-        if not self.setup_dll():
+        # If official fails, try local wheel
+        if not blpapi_success:
+            print("\n🔄 Trying fallback installation method...")
+            blpapi_success = self.install_blpapi_wheel()
+
+            # If wheel method succeeds, setup DLL
+            if blpapi_success:
+                if not self.setup_dll():
+                    print("\n⚠️  DLL setup failed, but pip installation may still work")
+
+        if not blpapi_success:
+            print("\n❌ All Bloomberg API installation methods failed!")
+            print("\nTroubleshooting:")
+            print("1. Check internet connection for official method")
+            print("2. Download wheel file from Bloomberg Terminal: API<GO>")
+            print("3. Run: python bloomberg_diagnostics.py")
             return False
 
         # Test import
         if not self.test_import():
-            print("\n⚠️  Import test failed, but setup is complete")
-            print("   Try running this script again")
+            print("\n⚠️  Import test failed, but installation may still work")
+            print("   Check if Bloomberg Terminal is running")
 
         # Create helper scripts
         self.create_batch_script()
@@ -344,23 +403,20 @@ Write-Host ""
         # Final message
         self.print_header("✅ SETUP COMPLETE!")
         print("""
-You can now run:
+Bloomberg API installed successfully!
 
-1. Quick test:
-   python scripts\\historical_fetch.py --quick-test
+Next steps:
+1. Ensure Bloomberg Terminal is running and logged in
+2. Test: python -c "import blpapi; print('Success!')"
 
-2. API usage calculator:
-   python api_usage_calculator.py
+Available commands:
+- python scripts\\historical_fetch.py --quick-test
+- python app.py
+- run_bloomberg_fetcher.bat
 
-3. Web interface:
-   python app.py
+For new command sessions, run: setup_environment.bat
 
-4. Or use the batch file:
-   run_bloomberg_fetcher.bat
-
-Remember:
-- Bloomberg Terminal must be running and logged in
-- Run 'WAPI<GO>' in Bloomberg to check API status
+Note: Use API<GO> in Bloomberg Terminal (not WAPI<GO>)
 """)
 
         return True

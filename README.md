@@ -18,27 +18,34 @@ Fetches comprehensive options data for **portfolio hedging analysis**:
 
 ---
 
-## ⚡ Quick Start (2 Commands)
+## ⚡ Quick Start (2024 Official Method)
 
 ```bash
-# 1. Clone and setup
-git clone https://github.com/lucasking0109/bloomberg-qqq-fetcher.git
-cd bloomberg-qqq-fetcher
-python setup_bloomberg_terminal.py
+# 1. Clone and setup (uses Bloomberg's official pip repository)
+git clone https://github.com/lucasking0109/Bloomberg-data-fetcher.git
+cd Bloomberg-data-fetcher
+python bloomberg_official_setup.py
 
 # 2. Run the application
 python scripts\historical_fetch.py --quick-test
-# Or use: run_bloomberg_fetcher.bat (Windows)
+# Or use: quick_setup.bat (Windows) for GUI setup
 ```
 
-**Time Required**: 5 minutes setup, 25-30 minutes for complete dataset
+**Time Required**: 2 minutes setup, 25-30 minutes for complete dataset
+
+### 🎯 **Windows One-Click Setup**
+```bash
+# Double-click or run:
+quick_setup.bat
+```
+This provides a GUI menu with official Bloomberg installation methods.
 
 ### 🎯 **即插即用 (Plug & Play)**
 
 **Bloomberg Terminal 用戶：**
-1. **下載專案** → 雙擊 `run_bloomberg_fetcher.bat`
-2. **自動安裝** → 選擇功能執行
-3. **完成！** 無需手動配置
+1. **下載專案** → 雙擊 `quick_setup.bat`
+2. **選擇安裝方式** → 推薦「官方設定」
+3. **完成！** 使用Bloomberg官方pip倉庫，無需手動配置
 
 ---
 

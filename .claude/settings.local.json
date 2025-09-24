@@ -18,7 +18,9 @@
       "Bash(awk:*)",
       "Bash(find:*)",
       "Bash(python:*)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:www.bloomberg.com)"
     ],
     "deny": [],
     "ask": []
