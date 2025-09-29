@@ -168,7 +168,17 @@ def main():
 
         if not processed_data.empty:
             if 'fetch_date' in processed_data.columns:
-                print(f"📈 Unique Trading Days: {pd.to_datetime(processed_data['fetch_date']).dt.date.nunique()}")
+                try:
+                    # Filter out invalid dates and convert to datetime
+                    valid_dates = processed_data['fetch_date'].dropna()
+                    valid_dates = valid_dates[valid_dates != '']
+                    if len(valid_dates) > 0:
+                        unique_days = pd.to_datetime(valid_dates, errors='coerce').dt.date.nunique()
+                        print(f"📈 Unique Trading Days: {unique_days}")
+                    else:
+                        print(f"📈 Unique Trading Days: 0 (no valid dates)")
+                except Exception as e:
+                    print(f"📈 Unique Trading Days: N/A (date parsing error)")
             else:
                 print(f"📈 Unique Trading Days: N/A (fetch_date not available)")
             print(f"🎯 Unique Strikes: {processed_data['strike'].nunique()}")
