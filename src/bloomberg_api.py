@@ -327,20 +327,20 @@ class BloombergAPI:
         return pd.DataFrame()
 
     def _process_single_reference_security(self, security_data):
-        \"\"\"Process reference data for a single security\"\"\"
+        """Process reference data for a single security"""
         try:
-            ticker = security_data.getElementAsString(\"security\")
-            row_data = {\"ticker\": ticker}
+            ticker = security_data.getElementAsString("security")
+            row_data = {"ticker": ticker}
 
             # Check for security errors first
-            if security_data.hasElement(\"securityError\"):
-                error_info = security_data.getElement(\"securityError\")
-                print(f\"Warning: Security error for {ticker}: {error_info}\")
+            if security_data.hasElement("securityError"):
+                error_info = security_data.getElement("securityError")
+                print(f"Warning: Security error for {ticker}: {error_info}")
                 return None
 
             # Process field data if available
-            if security_data.hasElement(\"fieldData\"):
-                field_data = security_data.getElement(\"fieldData\")
+            if security_data.hasElement("fieldData"):
+                field_data = security_data.getElement("fieldData")
 
                 try:
                     for sub_element in field_data.elements():
@@ -364,19 +364,19 @@ class BloombergAPI:
                             try:
                                 row_data[field_name] = field_data.getElementAsString(field_name)
                             except Exception:
-                                row_data[field_name] = \"N/A\"
+                                row_data[field_name] = "N/A"
 
                     return row_data
 
                 except Exception as e:
-                    print(f\"Warning: Error processing field data for {ticker}: {e}\")
+                    print(f"Warning: Error processing field data for {ticker}: {e}")
                     return None
             else:
-                print(f\"Warning: No field data available for {ticker}\")
+                print(f"Warning: No field data available for {ticker}")
                 return None
 
         except Exception as e:
-            print(f\"Warning: Error processing security: {e}\")
+            print(f"Warning: Error processing security: {e}")
             return None
 
     def build_option_ticker(self, 
