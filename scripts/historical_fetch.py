@@ -13,6 +13,7 @@ from src.database_manager import DatabaseManager
 from datetime import datetime, timedelta
 import logging
 import argparse
+import pandas as pd
 
 logging.basicConfig(
     level=logging.INFO,
