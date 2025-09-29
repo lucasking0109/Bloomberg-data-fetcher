@@ -203,61 +203,86 @@ class BloombergAPI:
     def _process_historical_response(self) -> pd.DataFrame:
         """Process historical data response"""
         data_dict = {}
-        
+
         try:
             while True:
                 event = self.session.nextEvent(500)
-                
+
                 for msg in event:
                     if msg.hasElement("securityData"):
-                        security_data = msg.getElement("securityData")
-                        ticker = security_data.getElementAsString("security")
-                        field_data = security_data.getElement("fieldData")
-                        
-                        dates = []
-                        values = {}
-                        
-                        for i in range(field_data.numValues()):
-                            element = field_data.getValue(i)
-                            try:
-                                date = element.getElementAsString("date")
-                                dates.append(date)
+                        security_data_element = msg.getElement("securityData")
 
-                                for sub_element in element.elements():
-                                    field_name = sub_element.name()
-                                    if field_name != "date":
-                                        if field_name not in values:
-                                            values[field_name] = []
-                                        try:
-                                            values[field_name].append(
-                                                element.getElementAsFloat(field_name)
-                                            )
-                                        except Exception:
-                                            # Try as string if float fails
-                                            values[field_name].append(
-                                                element.getElementAsString(field_name)
-                                            )
-                            except Exception as e:
-                                print(f"Warning: Error processing element {i}: {e}")
-                                continue
+                        # Handle both single security and array responses
+                        if security_data_element.isArray():
+                            num_securities = security_data_element.numValues()
+                            for i in range(num_securities):
+                                security_data = security_data_element.getValue(i)
+                                self._process_single_historical_security(security_data, data_dict)
+                        else:
+                            self._process_single_historical_security(security_data_element, data_dict)
                         
-                        # Store data
-                        for field, vals in values.items():
-                            key = f"{ticker}_{field}"
-                            data_dict[key] = pd.Series(vals, index=pd.to_datetime(dates))
                 
                 if event.eventType() == blpapi.Event.RESPONSE:
                     break
-            
+
             # Convert to DataFrame
             if data_dict:
                 df = pd.DataFrame(data_dict)
                 return df
-            
+
         except Exception as e:
             logger.error(f"Error processing response: {e}")
-        
+
         return pd.DataFrame()
+
+    def _process_single_historical_security(self, security_data, data_dict):
+        """Process historical data for a single security"""
+        try:
+            ticker = security_data.getElementAsString("security")
+
+            if security_data.hasElement("fieldData"):
+                field_data = security_data.getElement("fieldData")
+                dates = []
+                values = {}
+
+                for i in range(field_data.numValues()):
+                    element = field_data.getValue(i)
+                    try:
+                        date = element.getElementAsString("date")
+                        dates.append(date)
+
+                        for sub_element in element.elements():
+                            field_name = sub_element.name()
+                            if field_name != "date":
+                                if field_name not in values:
+                                    values[field_name] = []
+                                try:
+                                    values[field_name].append(
+                                        element.getElementAsFloat(field_name)
+                                    )
+                                except Exception:
+                                    # Try as string if float fails
+                                    values[field_name].append(
+                                        element.getElementAsString(field_name)
+                                    )
+                    except Exception as e:
+                        print(f"Warning: Error processing element {i}: {e}")
+                        continue
+
+                # Store data with proper length matching
+                for field, vals in values.items():
+                    if len(vals) == len(dates):  # Only add if lengths match
+                        key = f"{ticker}_{field}"
+                        data_dict[key] = pd.Series(vals, index=pd.to_datetime(dates))
+                    else:
+                        print(f"Warning: Length mismatch for {ticker}_{field}: {len(vals)} values vs {len(dates)} dates")
+
+            elif security_data.hasElement("securityError"):
+                error_info = security_data.getElement("securityError")
+                print(f"Warning: Security error for {ticker}: {error_info}")
+
+        except Exception as e:
+            print(f"Warning: Error processing security data: {e}")
     
     def _process_reference_response(self) -> pd.DataFrame:
         """Process reference data response"""
@@ -269,36 +294,24 @@ class BloombergAPI:
                 
                 for msg in event:
                     if msg.hasElement("securityData"):
-                        security_data_array = msg.getElement("securityData")
-                        
-                        for i in range(security_data_array.numValues()):
-                            security_data = security_data_array.getValue(i)
-                            ticker = security_data.getElementAsString("security")
-                            field_data = security_data.getElement("fieldData")
-                            
-                            row_data = {"ticker": ticker}
+                        security_data_element = msg.getElement("securityData")
 
-                            try:
-                                for sub_element in field_data.elements():
-                                    field_name = sub_element.name()
-                                    try:
-                                        # Try to get as appropriate data type
-                                        if sub_element.isArray():
-                                            row_data[field_name] = str(sub_element)
-                                        elif sub_element.datatype() == blpapi.DataType.FLOAT64:
-                                            row_data[field_name] = field_data.getElementAsFloat(field_name)
-                                        elif sub_element.datatype() == blpapi.DataType.INT32:
-                                            row_data[field_name] = field_data.getElementAsInteger(field_name)
-                                        else:
-                                            row_data[field_name] = field_data.getElementAsString(field_name)
-                                    except Exception:
-                                        # Fallback to string
-                                        row_data[field_name] = field_data.getElementAsString(field_name)
-
-                                data_list.append(row_data)
-                            except Exception as e:
-                                print(f"Warning: Error processing security data for {ticker}: {e}")
-                                continue
+                        # Handle both single security and array responses
+                        try:
+                            if security_data_element.isArray():
+                                num_securities = security_data_element.numValues()
+                                for i in range(num_securities):
+                                    security_data = security_data_element.getValue(i)
+                                    row_data = self._process_single_reference_security(security_data)
+                                    if row_data:
+                                        data_list.append(row_data)
+                            else:
+                                row_data = self._process_single_reference_security(security_data_element)
+                                if row_data:
+                                    data_list.append(row_data)
+                        except Exception as e:
+                            print(f"Warning: Error processing securityData element: {e}")
+                            continue
                 
                 if event.eventType() == blpapi.Event.RESPONSE:
                     break
@@ -312,7 +325,60 @@ class BloombergAPI:
             logger.error(f"Error processing response: {e}")
         
         return pd.DataFrame()
-    
+
+    def _process_single_reference_security(self, security_data):
+        \"\"\"Process reference data for a single security\"\"\"
+        try:
+            ticker = security_data.getElementAsString(\"security\")
+            row_data = {\"ticker\": ticker}
+
+            # Check for security errors first
+            if security_data.hasElement(\"securityError\"):
+                error_info = security_data.getElement(\"securityError\")
+                print(f\"Warning: Security error for {ticker}: {error_info}\")
+                return None
+
+            # Process field data if available
+            if security_data.hasElement(\"fieldData\"):
+                field_data = security_data.getElement(\"fieldData\")
+
+                try:
+                    for sub_element in field_data.elements():
+                        field_name = sub_element.name()
+                        try:
+                            # Try to get as appropriate data type
+                            if sub_element.isArray():
+                                row_data[field_name] = str(sub_element)
+                            elif hasattr(blpapi, 'DataType'):
+                                if sub_element.datatype() == blpapi.DataType.FLOAT64:
+                                    row_data[field_name] = field_data.getElementAsFloat(field_name)
+                                elif sub_element.datatype() == blpapi.DataType.INT32:
+                                    row_data[field_name] = field_data.getElementAsInteger(field_name)
+                                else:
+                                    row_data[field_name] = field_data.getElementAsString(field_name)
+                            else:
+                                # Fallback if DataType not available
+                                row_data[field_name] = field_data.getElementAsString(field_name)
+                        except Exception:
+                            # Final fallback to string
+                            try:
+                                row_data[field_name] = field_data.getElementAsString(field_name)
+                            except Exception:
+                                row_data[field_name] = \"N/A\"
+
+                    return row_data
+
+                except Exception as e:
+                    print(f\"Warning: Error processing field data for {ticker}: {e}\")
+                    return None
+            else:
+                print(f\"Warning: No field data available for {ticker}\")
+                return None
+
+        except Exception as e:
+            print(f\"Warning: Error processing security: {e}\")
+            return None
+
     def build_option_ticker(self, 
                           underlying: str, 
                           expiry: str, 
