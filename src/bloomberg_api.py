@@ -219,16 +219,27 @@ class BloombergAPI:
                         
                         for i in range(field_data.numValues()):
                             element = field_data.getValue(i)
-                            date = element.getElementAsString("date")
-                            dates.append(date)
-                            
-                            for field_name in element.elementNames():
-                                if field_name != "date":
-                                    if field_name not in values:
-                                        values[field_name] = []
-                                    values[field_name].append(
-                                        element.getElementAsFloat(field_name)
-                                    )
+                            try:
+                                date = element.getElementAsString("date")
+                                dates.append(date)
+
+                                for sub_element in element.elements():
+                                    field_name = sub_element.name()
+                                    if field_name != "date":
+                                        if field_name not in values:
+                                            values[field_name] = []
+                                        try:
+                                            values[field_name].append(
+                                                element.getElementAsFloat(field_name)
+                                            )
+                                        except Exception:
+                                            # Try as string if float fails
+                                            values[field_name].append(
+                                                element.getElementAsString(field_name)
+                                            )
+                            except Exception as e:
+                                print(f"Warning: Error processing element {i}: {e}")
+                                continue
                         
                         # Store data
                         for field, vals in values.items():
@@ -266,11 +277,28 @@ class BloombergAPI:
                             field_data = security_data.getElement("fieldData")
                             
                             row_data = {"ticker": ticker}
-                            
-                            for field_name in field_data.elementNames():
-                                row_data[field_name] = field_data.getElementAsString(field_name)
-                            
-                            data_list.append(row_data)
+
+                            try:
+                                for sub_element in field_data.elements():
+                                    field_name = sub_element.name()
+                                    try:
+                                        # Try to get as appropriate data type
+                                        if sub_element.isArray():
+                                            row_data[field_name] = str(sub_element)
+                                        elif sub_element.datatype() == blpapi.DataType.FLOAT64:
+                                            row_data[field_name] = field_data.getElementAsFloat(field_name)
+                                        elif sub_element.datatype() == blpapi.DataType.INT32:
+                                            row_data[field_name] = field_data.getElementAsInteger(field_name)
+                                        else:
+                                            row_data[field_name] = field_data.getElementAsString(field_name)
+                                    except Exception:
+                                        # Fallback to string
+                                        row_data[field_name] = field_data.getElementAsString(field_name)
+
+                                data_list.append(row_data)
+                            except Exception as e:
+                                print(f"Warning: Error processing security data for {ticker}: {e}")
+                                continue
                 
                 if event.eventType() == blpapi.Event.RESPONSE:
                     break
