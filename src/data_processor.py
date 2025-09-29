@@ -84,7 +84,7 @@ class DataProcessor:
             # Create records for each date
             for date in dates_with_data:
                 record = ticker_info.copy()
-                record['fetch_date'] = date
+                record['fetch_date'] = date.strftime('%Y-%m-%d') if hasattr(date, 'strftime') else str(date)
 
                 # Add field data
                 for field_name, col_name in fields.items():
@@ -163,10 +163,20 @@ class DataProcessor:
             logger.warning("Empty DataFrame received")
             return df
         
-        # Check required fields
-        missing_fields = [f for f in self.required_fields if f not in df.columns]
-        if missing_fields:
-            logger.warning(f"Missing fields: {missing_fields}")
+        # Determine if this is transformed data or Bloomberg format
+        is_transformed = 'underlying' in df.columns and 'strike' in df.columns
+
+        if is_transformed:
+            # Check transformed format required fields
+            transformed_required = ['ticker', 'underlying', 'expiry', 'strike', 'option_type']
+            missing_fields = [f for f in transformed_required if f not in df.columns]
+            if missing_fields:
+                logger.warning(f"Missing transformed fields: {missing_fields}")
+        else:
+            # Check Bloomberg format required fields
+            missing_fields = [f for f in self.required_fields if f not in df.columns]
+            if missing_fields:
+                logger.warning(f"Missing Bloomberg fields: {missing_fields}")
         
         # Clean data
         df = self._clean_prices(df)
@@ -178,26 +188,39 @@ class DataProcessor:
     
     def _clean_prices(self, df: pd.DataFrame) -> pd.DataFrame:
         """Clean price fields"""
-        price_fields = ['PX_BID', 'PX_ASK', 'PX_LAST', 'IVOL_MID', 
-                       'DELTA', 'GAMMA', 'THETA', 'VEGA', 'RHO']
-        
-        for field in price_fields:
+        # Bloomberg format fields
+        bloomberg_price_fields = ['PX_BID', 'PX_ASK', 'PX_LAST', 'IVOL_MID',
+                                'DELTA', 'GAMMA', 'THETA', 'VEGA', 'RHO']
+
+        # Transformed format fields
+        transformed_price_fields = ['bid', 'ask', 'last', 'implied_vol',
+                                  'delta', 'gamma', 'theta', 'vega', 'rho',
+                                  'volume', 'open_interest']
+
+        # Combine all possible price fields
+        all_price_fields = bloomberg_price_fields + transformed_price_fields
+
+        for field in all_price_fields:
             if field in df.columns:
                 # Convert to numeric, handle errors
                 df[field] = pd.to_numeric(df[field], errors='coerce')
-                
-                # Handle negative prices
-                if field in ['PX_BID', 'PX_ASK', 'PX_LAST']:
+
+                # Handle negative prices for bid/ask/last fields
+                negative_check_fields = ['PX_BID', 'PX_ASK', 'PX_LAST', 'bid', 'ask', 'last']
+                if field in negative_check_fields:
                     df.loc[df[field] < 0, field] = np.nan
         
         return df
     
     def _calculate_derived_fields(self, df: pd.DataFrame) -> pd.DataFrame:
         """Calculate derived fields"""
-        # Calculate spread
+        # Calculate spread - handle both Bloomberg and transformed formats
         if 'PX_BID' in df.columns and 'PX_ASK' in df.columns:
             df['spread'] = df['PX_ASK'] - df['PX_BID']
             df['spread_pct'] = (df['spread'] / df['PX_ASK']) * 100
+        elif 'bid' in df.columns and 'ask' in df.columns:
+            df['spread'] = df['ask'] - df['bid']
+            df['spread_pct'] = (df['spread'] / df['ask']) * 100
         
         # Calculate moneyness
         if 'strike' in df.columns and 'spot_price' in df.columns:

@@ -196,16 +196,32 @@ class DatabaseManager:
             logger.warning("Empty DataFrame, nothing to save")
             return 0
         
-        # Add fetch date
-        df['fetch_date'] = datetime.now().date()
-        
+        # Ensure we have the fetch_date column (don't override if it exists)
+        if 'fetch_date' not in df.columns:
+            df['fetch_date'] = datetime.now().date()
+
+        # Filter columns to match database schema
+        db_columns = [
+            'ticker', 'underlying', 'expiry', 'strike', 'option_type',
+            'bid', 'ask', 'last', 'volume', 'open_interest', 'implied_vol',
+            'delta', 'gamma', 'theta', 'vega', 'rho', 'underlying_price',
+            'bid_size', 'ask_size', 'spread', 'spread_pct', 'moneyness',
+            'days_to_expiry', 'fetch_date'
+        ]
+
+        # Only keep columns that exist in both the dataframe and database schema
+        available_columns = [col for col in db_columns if col in df.columns]
+        df_filtered = df[available_columns].copy()
+
+        logger.info(f"Saving {len(available_columns)} columns: {available_columns}")
+
         conn = sqlite3.connect(self.db_path)
-        
+
         try:
             # Save to database
             records_before = self._get_record_count(conn)
-            
-            df.to_sql(
+
+            df_filtered.to_sql(
                 'options_data',
                 conn,
                 if_exists='append',
