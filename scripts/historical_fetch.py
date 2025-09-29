@@ -166,7 +166,10 @@ def main():
         print(f"✅ Records Validated: {len(processed_data):,}")
 
         if not processed_data.empty:
-            print(f"📈 Unique Trading Days: {pd.to_datetime(processed_data['fetch_date']).dt.date.nunique()}")
+            if 'fetch_date' in processed_data.columns:
+                print(f"📈 Unique Trading Days: {pd.to_datetime(processed_data['fetch_date']).dt.date.nunique()}")
+            else:
+                print(f"📈 Unique Trading Days: N/A (fetch_date not available)")
             print(f"🎯 Unique Strikes: {processed_data['strike'].nunique()}")
             print(f"📅 Unique Expiries: {processed_data['expiry'].nunique()}")
 
