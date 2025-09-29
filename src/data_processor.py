@@ -23,7 +23,132 @@ class DataProcessor:
             'ticker', 'strike', 'option_type', 'expiry',
             'PX_BID', 'PX_ASK', 'PX_LAST'
         ]
-    
+
+        # Bloomberg field mappings
+        self.bloomberg_field_mappings = {
+            'PX_BID': 'bid',
+            'PX_ASK': 'ask',
+            'PX_LAST': 'last',
+            'PX_VOLUME': 'volume',
+            'OPEN_INT': 'open_interest',
+            'IVOL_MID': 'implied_vol',
+            'DELTA': 'delta',
+            'GAMMA': 'gamma',
+            'THETA': 'theta',
+            'VEGA': 'vega',
+            'RHO': 'rho'
+        }
+
+    def transform_bloomberg_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transform Bloomberg historical data format to standardized format
+
+        Args:
+            df: DataFrame with Bloomberg column names (e.g., 'QQQ US 10/03/25 C490 Equity_PX_BID')
+
+        Returns:
+            DataFrame with standardized columns
+        """
+        if df.empty:
+            return df
+
+        # Extract ticker information and data from column names
+        transformed_data = []
+
+        # Group columns by ticker (everything before the last underscore)
+        ticker_groups = {}
+        for col in df.columns:
+            if '_' in col:
+                ticker_part = col.rsplit('_', 1)[0]  # Get everything before last underscore
+                field_part = col.rsplit('_', 1)[1]   # Get field name after last underscore
+
+                if ticker_part not in ticker_groups:
+                    ticker_groups[ticker_part] = {}
+
+                ticker_groups[ticker_part][field_part] = col
+
+        # Process each ticker group
+        for ticker_key, fields in ticker_groups.items():
+            # Parse ticker information
+            ticker_info = self._parse_bloomberg_ticker(ticker_key)
+
+            if not ticker_info:
+                continue
+
+            # Get all dates that have data for this ticker
+            dates_with_data = set()
+            for field_name, col_name in fields.items():
+                if col_name in df.columns:
+                    dates_with_data.update(df[col_name].dropna().index)
+
+            # Create records for each date
+            for date in dates_with_data:
+                record = ticker_info.copy()
+                record['fetch_date'] = date
+
+                # Add field data
+                for field_name, col_name in fields.items():
+                    if col_name in df.columns and date in df.index:
+                        value = df.loc[date, col_name]
+                        if pd.notna(value):
+                            # Map Bloomberg field to standard field
+                            standard_field = self.bloomberg_field_mappings.get(field_name, field_name.lower())
+                            record[standard_field] = value
+
+                transformed_data.append(record)
+
+        if not transformed_data:
+            logger.warning("No data could be transformed")
+            return pd.DataFrame()
+
+        result_df = pd.DataFrame(transformed_data)
+        logger.info(f"Transformed {len(result_df)} records from Bloomberg format")
+
+        return result_df
+
+    def _parse_bloomberg_ticker(self, ticker_key: str) -> Optional[Dict]:
+        """
+        Parse Bloomberg ticker to extract option information
+
+        Example: 'QQQ US 10/03/25 C490 Equity' -> {
+            'underlying': 'QQQ',
+            'expiry': '20251003',
+            'option_type': 'C',
+            'strike': 490.0,
+            'ticker': 'QQQ US 10/03/25 C490 Equity'
+        }
+        """
+        try:
+            parts = ticker_key.split()
+            if len(parts) < 4:
+                return None
+
+            underlying = parts[0]  # QQQ
+            country = parts[1]     # US
+            date_part = parts[2]   # 10/03/25
+            option_part = parts[3] # C490
+
+            # Parse date (MM/DD/YY format)
+            month, day, year = date_part.split('/')
+            year = f"20{year}"  # Convert 25 -> 2025
+            expiry = f"{year}{month.zfill(2)}{day.zfill(2)}"
+
+            # Parse option type and strike
+            option_type = option_part[0]  # C or P
+            strike = float(option_part[1:])  # 490
+
+            return {
+                'ticker': ticker_key,
+                'underlying': underlying,
+                'expiry': expiry,
+                'option_type': option_type,
+                'strike': strike
+            }
+
+        except Exception as e:
+            logger.warning(f"Could not parse ticker '{ticker_key}': {e}")
+            return None
+
     def validate_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Validate and clean options data

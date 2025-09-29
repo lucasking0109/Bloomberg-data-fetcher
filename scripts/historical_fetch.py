@@ -115,8 +115,16 @@ def main():
 
         logger.info(f"Fetched {len(data)} historical records")
 
-        # Process data
-        processed_data = fetcher.processor.validate_data(data)
+        # Transform Bloomberg data format to standardized format
+        if not data.empty:
+            logger.info("Transforming Bloomberg data format...")
+            transformed_data = fetcher.processor.transform_bloomberg_data(data)
+            logger.info(f"Transformed data to {len(transformed_data)} records")
+        else:
+            transformed_data = data
+
+        # Validate processed data
+        processed_data = fetcher.processor.validate_data(transformed_data)
         logger.info(f"Validated {len(processed_data)} records")
 
         # Save to database if requested
