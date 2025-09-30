@@ -282,3 +282,13 @@ streamlit run app.py
 ```
 
 **Ready to fetch professional-grade options data!** 🚀
+
+---
+
+## 👨‍💻 Author
+
+**Lucas King** - Professional Bloomberg Terminal Integration Developer
+- GitHub: [@lucasking0109](https://github.com/lucasking0109)
+- Email: lucas196700@gmail.com
+
+*Specializing in institutional-grade financial data solutions and Bloomberg Terminal integrations.*
