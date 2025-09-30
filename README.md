@@ -1,6 +1,6 @@
 # 🚀 Bloomberg QQQ Options Fetcher
 
-**Professional-grade options data fetcher for QQQ index and top 20 constituent stocks with comprehensive Greeks and Open Interest data.**
+**Professional-grade options data fetcher for QQQ index and individual constituent stocks with comprehensive Greeks and market data.**
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Bloomberg API](https://img.shields.io/badge/Bloomberg-API-orange.svg)](https://www.bloomberg.com/professional/support/api-library/)
@@ -8,341 +8,277 @@
 
 ## 🎯 What This Does
 
-Fetches comprehensive options data for **portfolio hedging analysis**:
-- **QQQ Index Options**: ATM ± 40 strikes, all weekly expiries within 60 days  
-- **Top 20 QQQ Constituents**: AAPL, MSFT, NVDA, AMZN, META, etc.
-- **Critical Data**: Open Interest, all Greeks (Delta, Gamma, Theta, Vega, Rho)
-- **Smart Export**: CSV for testing, Parquet for production datasets
-
-**Data Volume**: ~97,000 options records per fetch (4x more comprehensive than typical)
+Fetches comprehensive options data for **professional trading analysis**:
+- **QQQ Index Options**: Historical and real-time options data with full Greeks
+- **Top 20 QQQ Constituents**: AAPL, MSFT, NVDA, AMZN, META, GOOGL, etc.
+- **26 Bloomberg Fields**: Open Interest, Delta, Gamma, Theta, Vega, Implied Vol, Time Value
+- **Multiple Formats**: CSV, Parquet, Excel export with SQLite database storage
+- **Visual Interface**: Streamlit dashboard for easy operation
 
 ---
 
-## ⚡ Quick Start (2024 Official Method)
+## ⚡ Quick Start
 
+### 1. Clone and Setup
 ```bash
-# 1. Clone and setup (uses Bloomberg's official pip repository)
-git clone https://github.com/lucasking0109/Bloomberg-data-fetcher.git
-cd Bloomberg-data-fetcher
-python bloomberg_official_setup.py
-
-# 2. Run the application
-python scripts\historical_fetch.py --quick-test
-# Or use: quick_setup.bat (Windows) for GUI setup
+git clone https://github.com/lucasking0109/bloomberg-qqq-fetcher.git
+cd bloomberg-qqq-fetcher
+python setup_bloomberg_terminal.py
 ```
 
-**Time Required**: 2 minutes setup, 25-30 minutes for complete dataset
-
-### 🎯 **Windows One-Click Setup**
+### 2. Fetch Data
 ```bash
-# Double-click or run:
-quick_setup.bat
-```
-This provides a GUI menu with official Bloomberg installation methods.
+# QQQ historical options (30 days)
+python scripts/historical_fetch.py --days 30
 
-### 🎯 **即插即用 (Plug & Play)**
+# Individual stock options (AAPL)
+python scripts/constituents_fetch.py --ticker AAPL
 
-**Bloomberg Terminal 用戶：**
-1. **下載專案** → 雙擊 `quick_setup.bat`
-2. **選擇安裝方式** → 推薦「官方設定」
-3. **完成！** 使用Bloomberg官方pip倉庫，無需手動配置
-
----
-
-## 🖥️ Web Interface Features
-
-### 🔥 One-Click Operations
-- **Test Connection** - Verify Bloomberg Terminal access
-- **Fetch Top 5** - Quick test (5 min, CSV export)  
-- **Fetch All 20** - Complete dataset (30 min, Parquet export)
-- **Resume** - Continue interrupted fetches
-- **Smart Export** - Auto-selects optimal format
-
-### 📊 Real-Time Monitoring  
-- Live progress bars and counters
-- API usage tracking (50K daily limit)
-- Current ticker being processed
-- Error recovery status
-
-### 💾 Data Management
-- Database statistics and health
-- Export format selection (CSV/Parquet)
-- Historical data cleanup
-- Data preview and validation
-
----
-
-## 📦 What You Get
-
-### **Options Data** (per ticker):
-- **Strikes**: ATM ± 40 (80 total per expiry)
-- **Expiries**: All weekly + quarterly within 60 days
-- **Greeks**: Delta, Gamma, Theta, Vega, Rho
-- **Liquidity**: Volume, **Open Interest**, Bid/Ask spreads
-
-### **Equity Data**:
-- Real-time prices and volumes
-- Market cap, PE ratios, dividend yields
-- 30-day volatility and averages
-
-### **Export Formats**:
-```python
-# CSV (testing, ≤5 stocks)
-df = pd.read_csv('data/bloomberg_data_20250910_143022.csv')
-
-# Parquet (production, full dataset - 10x faster loading)
-df = pd.read_parquet('data/bloomberg_data_20250910_143022.parquet')
+# Top 10 constituents by weight
+python scripts/constituents_fetch.py --top 10
 ```
 
+### 3. Visual Interface (Optional)
+```bash
+# Launch web dashboard
+streamlit run app.py
+```
+
+**Time Required**: 2 minutes setup, 5-30 minutes for data fetching
+
 ---
 
-## 🏗️ Architecture
+## 📊 Features
+
+### QQQ Options Data
+- **ATM ± 40 strikes** for comprehensive coverage
+- **All expiries within 60 days**
+- **Historical snapshots** for backtesting
+- **Full Greeks** (Delta, Gamma, Theta, Vega, Rho)
+
+### Individual Stock Options
+- **Top 20 QQQ constituents** by market weight
+- **Single ticker** or **bulk fetching**
+- **Same comprehensive fields** as QQQ
+- **Real-time spot prices** for accurate moneyness
+
+### Data Quality
+- **Built-in validation** removes invalid records
+- **Quality scoring** (A+ to F grades)
+- **Error handling** with automatic retries
+- **Progress tracking** and resumable fetches
+
+---
+
+## 🛠️ Requirements
+
+### Prerequisites
+- **Bloomberg Terminal** subscription and login
+- **Python 3.8+** (64-bit)
+- **Windows/Mac/Linux** support
+
+### Dependencies
+```bash
+# Automatically installed by setup script
+pandas>=1.3.0
+numpy>=1.21.0
+blpapi>=3.18.0
+streamlit>=1.28.0
+plotly>=5.0.0
+pyyaml>=6.0
+```
+
+---
+
+## 📁 Project Structure
 
 ```
 bloomberg-qqq-fetcher/
-├── 🌐 app.py                  # Web dashboard (Streamlit)
-├── 🚀 setup_and_run.py       # One-click launcher
-├── 📖 START_HERE.md           # Simple user guide
-│
-├── config/
-│   ├── config.yaml            # Main configuration  
-│   └── qqq_constituents.yaml  # 20 stocks + settings
-│
-├── src/
-│   ├── bloomberg_api.py       # Bloomberg Terminal connection
-│   ├── qqq_options_fetcher.py # QQQ index options (weekly expiries)
-│   ├── constituents_fetcher.py # 20 stocks options (±40 strikes)
-│   ├── database_manager.py    # SQLite + Parquet export
-│   └── fetch_state_manager.py # Resume capability
-│
+├── setup_bloomberg_terminal.py  # Main setup script
+├── app.py                      # Streamlit web interface
 ├── scripts/
-│   ├── robust_fetch.py        # Main CLI script
-│   ├── check_progress.py      # Monitor running fetches
-│   └── setup_bloomberg.py     # Bloomberg API installer
-│
-└── data/                      # Output directory
-    ├── bloomberg_options.db   # SQLite database
-    └── *.parquet             # Efficient data files
+│   ├── historical_fetch.py     # QQQ options fetcher
+│   └── constituents_fetch.py   # Individual stocks fetcher
+├── src/                        # Core modules
+│   ├── bloomberg_api.py        # Bloomberg Terminal connection
+│   ├── qqq_options_fetcher.py  # QQQ data logic
+│   ├── constituents_fetcher.py # Individual stocks logic
+│   ├── data_processor.py       # Data validation & transformation
+│   ├── database_manager.py     # SQLite database operations
+│   └── usage_monitor.py        # API quota management
+├── config/
+│   ├── config.yaml             # Main configuration
+│   └── qqq_constituents.yaml   # Top 20 stocks configuration
+└── data/                       # Output directory
+    └── bloomberg_options.db    # SQLite database
 ```
 
 ---
 
-## 🎮 Usage Modes
+## 🚀 Usage Examples
 
-### 1. **Web Interface** (Recommended)
+### Quick Test
 ```bash
-python setup_and_run.py
-# Opens browser automatically
-# Click buttons to fetch data
+# Test with limited data (recommended first run)
+python scripts/historical_fetch.py --quick-test
 ```
 
-### 2. **Command Line**
+### Historical QQQ Data
 ```bash
-# Full dataset (QQQ + 20 stocks, Parquet)
-python scripts/robust_fetch.py --export-csv
+# Last 60 days
+python scripts/historical_fetch.py --days 60 --export-format parquet
 
-# Testing (5 stocks, CSV)  
-python scripts/robust_fetch.py --top-n 5 --export-csv --export-format csv
-
-# Resume if interrupted
-python scripts/robust_fetch.py --resume
+# Specific date range
+python scripts/historical_fetch.py --start-date 2024-01-01 --end-date 2024-01-31
 ```
 
-### 3. **Python Integration**
+### Individual Stocks
+```bash
+# Single stock
+python scripts/constituents_fetch.py --ticker AAPL --export-format csv
+
+# Top 5 by weight
+python scripts/constituents_fetch.py --top 5
+
+# All 20 constituents
+python scripts/constituents_fetch.py --all
+```
+
+### Web Interface
+```bash
+# Launch dashboard
+streamlit run app.py
+
+# Features:
+# - Visual database statistics
+# - One-click data fetching
+# - Real-time progress monitoring
+# - Data preview with charts
+```
+
+---
+
+## 📈 Data Output
+
+### Exported Files
+```
+data/
+├── qqq_options_20241201_143022.parquet    # QQQ historical data
+├── AAPL_options_20241201_143045.csv       # Individual stock data
+└── bloomberg_options.db                   # SQLite database
+```
+
+### Database Tables
+- **options_data**: All options records with full Bloomberg fields
+- **equity_data**: Underlying stock prices and metrics
+
+### Key Fields
 ```python
-from src.database_manager import DatabaseManager
-from src.constituents_fetcher import ConstituentsFetcher
-
-# Load existing data
-db = DatabaseManager()
-df = db.get_latest_data()
-
-# Fetch specific data
-fetcher = ConstituentsFetcher('config/config.yaml')
-aapl_options = fetcher.fetch_constituent_options('AAPL')
+# Options data includes:
+'ticker', 'underlying', 'strike', 'expiry', 'option_type',
+'px_last', 'px_bid', 'px_ask', 'px_settle', 'volume', 'open_int',
+'delta', 'gamma', 'theta', 'vega', 'rho', 'ivol_mid',
+'time_value', 'intrinsic_val', 'moneyness', 'fetch_time'
 ```
 
 ---
 
-## ⚙️ Configuration
+## 🔧 Configuration
 
-Key settings in `config/qqq_constituents.yaml`:
-
+### Main Settings (`config/config.yaml`)
 ```yaml
-fetch_config:
-  strikes_above_atm: 40      # ±40 strikes (was ±20)
-  strikes_below_atm: 40
-  max_days_to_expiry: 60     # 2 months
-  
-option_fields:
-  - OPEN_INT                 # Critical for liquidity
-  - DELTA                    # All Greeks included
-  - GAMMA
-  - THETA
-  - VEGA
-  - RHO
+bloomberg:
+  host: localhost
+  port: 8194
+
+limits:
+  daily_limit: 100000
+  monthly_limit: 1000000
+  batch_size: 20
+  request_delay: 1.0
+
+output:
+  format: parquet
+  database_path: data/bloomberg_options.db
+```
+
+### Constituents (`config/qqq_constituents.yaml`)
+```yaml
+constituents:
+  - ticker: AAPL
+    name: Apple Inc
+    weight: 8.9
+  - ticker: MSFT
+    name: Microsoft Corporation
+    weight: 8.5
+  # ... (20 total stocks)
 ```
 
 ---
 
-## 🔧 System Requirements
+## 🚨 Troubleshooting
 
-### **🏢 Bloomberg Terminal (REQUIRED)**
-- ✅ **Valid Bloomberg Terminal subscription** (CRITICAL!)
-- ✅ Terminal running and logged in on the same machine
-- ✅ API access enabled on your account
-- ✅ Use `API<GO>` (not `WAPI<GO>` - retired in 2024)
-- ⚠️  **This is NOT a free API** - requires paid Bloomberg subscription
+### Common Issues
+1. **"Import blpapi failed"**
+   ```bash
+   # Re-run setup with admin privileges
+   python setup_bloomberg_terminal.py
+   ```
 
-### **💻 Python Environment**
-- Python 3.8+ (64-bit REQUIRED for Bloomberg API)
-- Dependencies auto-installed by `setup_bloomberg_terminal.py`
-- ~200MB for dependencies
+2. **"Connection failed"**
+   - Ensure Bloomberg Terminal is running and logged in
+   - Check account has API access enabled
 
-### **🖥️ Hardware**
-- 4GB+ RAM (for large datasets)
-- 1GB disk space (for data storage)
-- Windows 10/11 (Bloomberg Terminal compatibility)
-- Stable internet connection
+3. **"No data returned"**
+   - Verify market hours (options data available 6:30 AM - 5:00 PM ET)
+   - Check ticker symbols are valid
 
-### **🔐 Account Requirements**
-- Bloomberg Terminal user credentials
-- API access permissions (contact Bloomberg if needed)
-- Active subscription that includes API functionality
-
----
-
-## 📈 Performance & Limits
-
-### **Bloomberg API Usage**
-- **Daily Limit**: 50,000 data points
-- **Monthly Limit**: 500,000 data points  
-- **Full Fetch Usage**: ~43,000 points (85% of daily)
-- **Optimal Time**: After 4:30 PM ET
-
-### **Data Processing**
-- **Fetch Time**: 25-30 minutes (full dataset)
-- **Database Size**: ~100MB (97,000 records)
-- **Export Speeds**: 
-  - CSV: ~40MB, moderate loading
-  - Parquet: ~20MB, 10x faster loading
-
----
-
-## 🆘 Troubleshooting
-
-### **🔍 First Step: Run Diagnostics**
+### Quick Fixes
 ```bash
-# Comprehensive system check
-python bloomberg_diagnostics.py
-
-# Quick setup attempt
-python setup_bloomberg_terminal.py
-```
-
-### **📋 Bloomberg Connection Issues**
-```bash
-# Common Issues:
-# 1. Terminal not running: Start Bloomberg Terminal and log in
-# 2. WAPI retired: Use API<GO> instead of WAPI<GO>
-# 3. DLL not found: Run python setup_bloomberg_terminal.py
-
-# Manual fix if automatic fails:
-# See MANUAL_FIX_GUIDE.md for step-by-step instructions
-```
-
-### **🔧 File Not Found Errors**
-```bash
-# Error: FileNotFoundError: blpapi3_64.dll
-# Solution 1: Automatic fix
+# Full diagnostic and setup
 python setup_bloomberg_terminal.py
 
-# Solution 2: Manual fix (as Administrator)
-copy blpapi3_64.dll "C:\Users\{username}\AppData\Local\Programs\Python\Python313\"
+# Test connection
+python -c "import blpapi; print('✅ Success')"
 
-# Solution 3: Check Bloomberg Terminal is running
-# In Terminal: API<GO> → Download Python API
-```
-
-### **🚫 Access Denied / Not Authorized**
-```
-Contact Bloomberg Support:
-- Verify your account has API access
-- Check subscription includes API functionality
-- Request API permissions activation
-- Ensure you're logged into Terminal on the same machine
-```
-
-### **⏸️ Interrupted Fetches**
-```bash
-# Resume from where it stopped
-python scripts/historical_fetch.py --resume
-
-# Check progress
-python bloomberg_diagnostics.py
-```
-
-### **📊 Data Validation**
-```python
-from src.database_manager import DatabaseManager
-db = DatabaseManager()
-stats = db.get_summary_stats()
-print(f"Total records: {stats['total_records']}")  # Should be ~97,000
+# Check API access in Bloomberg Terminal
+API<GO>
 ```
 
 ---
 
-## 🎯 For AI Assistants
+## 📞 Support
 
-**Default Behavior**: This system fetches QQQ + **all 20 constituents** by default. Key commands:
-
-```bash
-# Full production fetch (preferred)
-python scripts/robust_fetch.py --export-csv
-
-# Testing subset  
-python scripts/robust_fetch.py --top-n 5 --export-csv
-
-# Web interface
-python setup_and_run.py
-```
-
-**Critical Fields**: Always ensure `OPEN_INT` (Open Interest) is included in options data for liquidity analysis.
-
-**Export Logic**: Auto-selects CSV for ≤5 stocks (testing), Parquet for full datasets (production).
-
----
-
-## 📚 Documentation
-
-- **[QUICK_START.md](QUICK_START.md)** - 2-minute setup guide
-- **[START_HERE.md](START_HERE.md)** - Simple user guide  
-- **[AI_ASSISTANT_GUIDE.md](AI_ASSISTANT_GUIDE.md)** - AI assistant reference
-- **[CURSOR_AI_INSTRUCTIONS.md](CURSOR_AI_INSTRUCTIONS.md)** - Complete technical specs  
-- **[BLOOMBERG_SETUP.md](BLOOMBERG_SETUP.md)** - Bloomberg API installation
-- **[BLOOMBERG_API_QUICK_REFERENCE.md](BLOOMBERG_API_QUICK_REFERENCE.md)** - API usage guide
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history
-- **[DISCLAIMER.md](DISCLAIMER.md)** - Legal notices
+- **Setup Issues**: Run `python setup_bloomberg_terminal.py`
+- **API Problems**: Check `BLOOMBERG_API_QUICK_REFERENCE.md`
+- **Data Issues**: See `BLOOMBERG_API_FIXES.md`
+- **Bloomberg Support**: https://www.bloomberg.com/professional/support/
 
 ---
 
 ## 📄 License
 
-MIT License - feel free to use for commercial or personal projects.
+MIT License - feel free to use for commercial and personal projects.
 
 ---
 
-## 🚀 Get Started Now
+## 🎯 Quick Commands Summary
 
 ```bash
-git clone https://github.com/lucasking0109/bloomberg-qqq-fetcher.git
-cd bloomberg-qqq-fetcher  
-python setup_and_run.py
+# Setup
+python setup_bloomberg_terminal.py
+
+# Quick test
+python scripts/historical_fetch.py --quick-test
+
+# QQQ data (30 days)
+python scripts/historical_fetch.py --days 30
+
+# Individual stock
+python scripts/constituents_fetch.py --ticker AAPL
+
+# Web interface
+streamlit run app.py
 ```
 
-**Ready to fetch comprehensive options data for portfolio hedging analysis!** 📊⚡
-
----
-
-*Built for professional traders and quants who need comprehensive options data with Open Interest and Greeks for QQQ and its major constituents.*
+**Ready to fetch professional-grade options data!** 🚀

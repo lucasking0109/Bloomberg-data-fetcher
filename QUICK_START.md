@@ -1,162 +1,133 @@
 # 🚀 QUICK START - Bloomberg QQQ Fetcher
 
-## 🎯 For New Users (2 Minutes)
+## ⚡ 3-Step Setup (2 Minutes)
 
 ```bash
-# Clone repository
+# 1. Clone repository
 git clone https://github.com/lucasking0109/bloomberg-qqq-fetcher.git
 cd bloomberg-qqq-fetcher
 
-# One-click setup and launch
-python setup_and_run.py
+# 2. Setup Bloomberg API
+python setup_bloomberg_terminal.py
+
+# 3. Test connection
+python scripts/historical_fetch.py --quick-test
 ```
 
-**That's it!** Web interface opens automatically in your browser.
+**Done!** You now have professional-grade options data fetching.
 
 ---
 
-## 🔥 Web Interface Actions
+## 🎯 Choose Your Interface
 
-### **Testing (5 minutes)**
-1. Click **"Test Connection"** → Verify Bloomberg is connected
-2. Click **"💼 Fetch Top 5"** → Get QQQ + 5 stocks (CSV format)
-3. Click **"📥 Export Data"** → Download results
-
-### **Production (30 minutes)**  
-1. Click **"🔥 Fetch All 20"** → Get complete dataset (Parquet format)
-2. Wait for completion → Monitor progress bar
-3. Click **"📥 Export Data"** → Download results
-
----
-
-## 💻 Command Line (Alternative)
-
+### 🖥️ Command Line (Fast)
 ```bash
-# Testing dataset
-python scripts/robust_fetch.py --top-n 5 --export-csv
+# QQQ options (30 days)
+python scripts/historical_fetch.py --days 30
 
-# Production dataset  
-python scripts/robust_fetch.py --export-csv
+# Individual stock (AAPL)
+python scripts/constituents_fetch.py --ticker AAPL
 
-# Resume if interrupted
-python scripts/robust_fetch.py --resume
+# Top 10 constituents
+python scripts/constituents_fetch.py --top 10
+```
+
+### 📊 Web Interface (Visual)
+```bash
+# Launch dashboard
+streamlit run app.py
+```
+Then open http://localhost:8501 in your browser.
+
+**Features:**
+- ✅ Visual database statistics
+- ✅ One-click data fetching
+- ✅ Real-time progress bars
+- ✅ Data preview with charts
+
+---
+
+## 🔥 Quick Commands
+
+### Testing (5 minutes)
+```bash
+# Quick test with limited data
+python scripts/historical_fetch.py --quick-test
+
+# Single stock test
+python scripts/constituents_fetch.py --ticker AAPL --export-format csv
+```
+
+### Production (15-30 minutes)
+```bash
+# Full QQQ dataset (60 days)
+python scripts/historical_fetch.py --days 60 --export-format parquet
+
+# All 20 constituents
+python scripts/constituents_fetch.py --all --export-format parquet
 ```
 
 ---
 
-## 📊 What You Get
+## 📁 Your Data
 
-### **Testing (5 stocks)**
-- **Records**: ~5,000 options 
-- **File**: CSV format (~2MB)
-- **Time**: 5 minutes
-- **Use**: Data validation, testing
-
-### **Production (20 stocks)**  
-- **Records**: ~97,000 options
-- **File**: Parquet format (~20MB)
-- **Time**: 30 minutes
-- **Use**: Portfolio analysis, hedging
-
----
-
-## 📂 Output Files
-
+All fetched data is saved to:
 ```
 data/
-├── bloomberg_options.db              # SQLite database
-├── bloomberg_data_20250910_143022.csv      # CSV export (testing)
-└── bloomberg_data_20250910_143022.parquet  # Parquet export (production)
-```
-
-### **Loading Data**
-```python
-import pandas as pd
-
-# CSV files
-df = pd.read_csv('data/bloomberg_data_20250910_143022.csv')
-
-# Parquet files (10x faster)
-df = pd.read_parquet('data/bloomberg_data_20250910_143022.parquet')
+├── qqq_options_[timestamp].parquet     # QQQ options data
+├── AAPL_options_[timestamp].csv        # Individual stock data
+├── top10_constituents_[timestamp].csv  # Bulk constituent data
+└── bloomberg_options.db                # SQLite database
 ```
 
 ---
 
-## ⚠️ Prerequisites
+## 🚨 Troubleshooting
 
-Before running, ensure:
-
-1. **Bloomberg Terminal** is running and logged in
-2. **Python 3.8+** is installed
-3. **WAPI enabled** in Bloomberg (type `WAPI<GO>`)
-4. **Best time**: After 4:30 PM ET (market close)
-
----
-
-## 🆘 Common Issues
-
-### **"Bloomberg not connected"**
+### "Import blpapi failed"
 ```bash
-# Check Terminal is running and logged in
-# Type WAPI<GO> in Terminal to enable API
+# Re-run setup with admin privileges
+python setup_bloomberg_terminal.py
 ```
 
-### **"blpapi not found"**
-```bash
-# API will auto-install, or manually:
-pip install blpapi-3.25.3-py3-none-win_amd64.whl
-```
+### "Connection failed"
+1. **Check Bloomberg Terminal is running and logged in**
+2. **Test API access**: Type `API<GO>` in Bloomberg Terminal
+3. **Verify account permissions** with Bloomberg support
 
-### **"Fetch interrupted"**
-```bash
-# Resume from where it stopped
-python scripts/robust_fetch.py --resume
-```
+### "No data returned"
+- **Market hours**: Options data available 6:30 AM - 5:00 PM ET
+- **Valid tickers**: Ensure stock symbols exist and have options
 
 ---
 
-## 🎯 Success Indicators
+## 🎯 What You Get
 
-### **Testing Complete When:**
-- Progress bar reaches 100%
-- Message: "✅ Data exported to CSV"
-- File size: ~2MB
-- Records: ~5,000
+### QQQ Options
+- **ATM ± 40 strikes** for comprehensive coverage
+- **All weekly expiries** within 60 days
+- **Full Greeks**: Delta, Gamma, Theta, Vega, Rho
+- **Open Interest** for liquidity analysis
 
-### **Production Complete When:**
-- Progress bar reaches 100%  
-- Message: "✅ Data exported to Parquet"
-- File size: ~20MB
-- Records: ~97,000
+### Individual Stocks
+- **Top 20 QQQ constituents** by weight
+- **Same comprehensive fields** as QQQ
+- **Real-time spot prices**
+- **Bulk or single-ticker** fetching
 
----
-
-## 📈 Data Contents
-
-Each options record includes:
-- **Basics**: ticker, strike, expiry, type (call/put)
-- **Prices**: bid, ask, last, underlying price
-- **Greeks**: Delta, Gamma, Theta, Vega, Rho
-- **Liquidity**: Volume, **Open Interest**, bid/ask sizes
-- **Analytics**: Implied volatility, moneyness, days to expiry
+### Data Quality
+- **26 Bloomberg fields** per option
+- **Built-in validation** removes bad records
+- **Quality scoring** (A+ to F grades)
+- **Professional export formats**
 
 ---
 
-## 🔗 Next Steps
+## 🎉 Next Steps
 
-- **Analysis**: Use Jupyter notebooks with pandas
-- **Automation**: Schedule daily runs via cron/Task Scheduler  
-- **Integration**: Import data into your trading systems
-- **Documentation**: See [README.md](README.md) for full details
+1. **Start with quick test**: `python scripts/historical_fetch.py --quick-test`
+2. **Try web interface**: `streamlit run app.py`
+3. **Fetch production data**: `python scripts/historical_fetch.py --days 30`
+4. **Analyze in Python**: `pandas.read_parquet('data/qqq_options_*.parquet')`
 
----
-
-## 🚀 Ready to Start?
-
-```bash
-git clone https://github.com/lucasking0109/bloomberg-qqq-fetcher.git
-cd bloomberg-qqq-fetcher
-python setup_and_run.py
-```
-
-**Click "💼 Fetch Top 5" to begin!** 🎯
+**Ready to analyze professional options data!** 🚀
