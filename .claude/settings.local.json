@@ -1,26 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add:*)",
-      "Read(//Users/lucasking/Desktop/**)",
-      "Bash(sqlite3:*)",
-      "Bash(git fetch:*)",
-      "Bash(git ls-tree:*)",
-      "Bash(git reset:*)",
-      "Bash(git push:*)",
-      "Bash(grep:*)",
-      "Bash(cat:*)",
-      "Bash(git commit:*)",
-      "WebFetch(domain:github.com)",
-      "Bash(gh repo view:*)",
-      "Bash(git log:*)",
-      "Bash(git config:*)",
-      "Bash(awk:*)",
-      "Bash(find:*)",
-      "Bash(python:*)",
-      "WebSearch",
-      "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:www.bloomberg.com)"
+      "WebFetch(domain:bloomberg.github.io)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

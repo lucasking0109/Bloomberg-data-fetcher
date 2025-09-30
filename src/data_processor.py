@@ -30,13 +30,28 @@ class DataProcessor:
             'PX_ASK': 'ask',
             'PX_LAST': 'last',
             'PX_VOLUME': 'volume',
+            'VOLUME': 'volume',  # Handle both variants
             'OPEN_INT': 'open_interest',
             'IVOL_MID': 'implied_vol',
             'DELTA': 'delta',
             'GAMMA': 'gamma',
             'THETA': 'theta',
             'VEGA': 'vega',
-            'RHO': 'rho'
+            'RHO': 'rho',
+            'OPT_UNDL_PX': 'underlying_price',
+            'BID_SIZE': 'bid_size',
+            'ASK_SIZE': 'ask_size',
+            'PX_SETTLE': 'settle_price',
+            'CHG_NET_1D': 'change_1d',
+            'CHG_PCT_1D': 'change_pct_1d',
+            'VOLATILITY_30D': 'volatility_30d',
+            'PX_HIGH': 'high',
+            'PX_LOW': 'low',
+            'TIME_LAST_UPD': 'last_update_time',
+            'IVOL_BID': 'implied_vol_bid',
+            'IVOL_ASK': 'implied_vol_ask',
+            'MONEYNESS': 'moneyness',
+            'TIME_TO_EXPIRY': 'time_to_expiry'
         }
 
     def transform_bloomberg_data(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -84,7 +99,24 @@ class DataProcessor:
             # Create records for each date
             for date in dates_with_data:
                 record = ticker_info.copy()
-                record['fetch_date'] = date.strftime('%Y-%m-%d') if hasattr(date, 'strftime') else str(date)
+                # Ensure proper date formatting
+                try:
+                    if isinstance(date, str):
+                        # If it's already a string, try to parse it
+                        parsed_date = pd.to_datetime(date)
+                        record['fetch_date'] = parsed_date.strftime('%Y-%m-%d')
+                    elif hasattr(date, 'strftime'):
+                        # If it's a datetime object
+                        record['fetch_date'] = date.strftime('%Y-%m-%d')
+                    else:
+                        # If it's something else (like int index), convert to datetime
+                        parsed_date = pd.to_datetime(date)
+                        record['fetch_date'] = parsed_date.strftime('%Y-%m-%d')
+                except Exception:
+                    # Fallback: use current date with offset
+                    from datetime import datetime, timedelta
+                    fallback_date = datetime.now() - timedelta(days=int(str(date)) if str(date).isdigit() else 0)
+                    record['fetch_date'] = fallback_date.strftime('%Y-%m-%d')
 
                 # Add field data
                 for field_name, col_name in fields.items():
@@ -189,13 +221,20 @@ class DataProcessor:
     def _clean_prices(self, df: pd.DataFrame) -> pd.DataFrame:
         """Clean price fields"""
         # Bloomberg format fields
-        bloomberg_price_fields = ['PX_BID', 'PX_ASK', 'PX_LAST', 'IVOL_MID',
-                                'DELTA', 'GAMMA', 'THETA', 'VEGA', 'RHO']
+        bloomberg_price_fields = ['PX_BID', 'PX_ASK', 'PX_LAST', 'PX_HIGH', 'PX_LOW',
+                                'PX_SETTLE', 'IVOL_MID', 'IVOL_BID', 'IVOL_ASK',
+                                'DELTA', 'GAMMA', 'THETA', 'VEGA', 'RHO',
+                                'CHG_NET_1D', 'CHG_PCT_1D', 'VOLATILITY_30D',
+                                'VOLUME', 'OPEN_INT', 'BID_SIZE', 'ASK_SIZE',
+                                'OPT_UNDL_PX', 'MONEYNESS', 'TIME_TO_EXPIRY']
 
         # Transformed format fields
-        transformed_price_fields = ['bid', 'ask', 'last', 'implied_vol',
+        transformed_price_fields = ['bid', 'ask', 'last', 'high', 'low', 'settle_price',
+                                  'implied_vol', 'implied_vol_bid', 'implied_vol_ask',
                                   'delta', 'gamma', 'theta', 'vega', 'rho',
-                                  'volume', 'open_interest']
+                                  'volume', 'open_interest', 'bid_size', 'ask_size',
+                                  'underlying_price', 'change_1d', 'change_pct_1d',
+                                  'volatility_30d', 'moneyness', 'time_to_expiry']
 
         # Combine all possible price fields
         all_price_fields = bloomberg_price_fields + transformed_price_fields
@@ -242,25 +281,73 @@ class DataProcessor:
         return df
     
     def _remove_invalid_records(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Remove invalid records"""
+        """Remove invalid records with comprehensive validation"""
         initial_count = len(df)
-        
-        # Remove records with invalid prices
+        validation_log = []
+
+        # Remove records with invalid bid/ask spreads (both formats)
         if 'PX_BID' in df.columns and 'PX_ASK' in df.columns:
-            df = df[df['PX_BID'] <= df['PX_ASK']]
-        
+            invalid_spreads = df['PX_BID'] > df['PX_ASK']
+            removed = invalid_spreads.sum()
+            if removed > 0:
+                validation_log.append(f"Removed {removed} records with invalid bid > ask (Bloomberg format)")
+            df = df[~invalid_spreads]
+        elif 'bid' in df.columns and 'ask' in df.columns:
+            invalid_spreads = df['bid'] > df['ask']
+            removed = invalid_spreads.sum()
+            if removed > 0:
+                validation_log.append(f"Removed {removed} records with invalid bid > ask (transformed format)")
+            df = df[~invalid_spreads]
+
         # Remove expired options
         if 'days_to_expiry' in df.columns:
-            df = df[df['days_to_expiry'] > 0]
-        
+            expired = df['days_to_expiry'] <= 0
+            removed = expired.sum()
+            if removed > 0:
+                validation_log.append(f"Removed {removed} expired options")
+            df = df[~expired]
+
         # Remove options with extreme spreads
         if 'spread_pct' in df.columns:
-            df = df[df['spread_pct'] < 50]  # Remove spreads > 50%
-        
-        removed_count = initial_count - len(df)
-        if removed_count > 0:
-            logger.info(f"Removed {removed_count} invalid records")
-        
+            extreme_spreads = df['spread_pct'] > 50
+            removed = extreme_spreads.sum()
+            if removed > 0:
+                validation_log.append(f"Removed {removed} options with spreads > 50%")
+            df = df[~extreme_spreads]
+
+        # Remove options with invalid implied volatility
+        iv_fields = ['IVOL_MID', 'implied_vol', 'implied_vol_bid', 'implied_vol_ask']
+        for iv_field in iv_fields:
+            if iv_field in df.columns:
+                invalid_iv = (df[iv_field] < 0) | (df[iv_field] > 5)  # IV should be between 0 and 500%
+                removed = invalid_iv.sum()
+                if removed > 0:
+                    validation_log.append(f"Removed {removed} records with invalid {iv_field}")
+                df = df[~invalid_iv]
+
+        # Remove options with zero volume and zero open interest
+        volume_fields = ['VOLUME', 'volume']
+        oi_fields = ['OPEN_INT', 'open_interest']
+
+        for vol_field in volume_fields:
+            if vol_field in df.columns:
+                for oi_field in oi_fields:
+                    if oi_field in df.columns:
+                        no_activity = (df[vol_field] == 0) & (df[oi_field] == 0)
+                        removed = no_activity.sum()
+                        if removed > 0:
+                            validation_log.append(f"Removed {removed} options with no volume and no open interest")
+                        df = df[~no_activity]
+                        break
+                break
+
+        # Log validation results
+        total_removed = initial_count - len(df)
+        if total_removed > 0:
+            logger.info(f"Data validation removed {total_removed} invalid records:")
+            for log_entry in validation_log:
+                logger.info(f"  - {log_entry}")
+
         return df
     
     def aggregate_by_strike(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -403,6 +490,149 @@ class DataProcessor:
         df_clean = df_clean[columns_to_keep]
         
         return df_clean
+
+    def create_data_quality_report(self, df: pd.DataFrame) -> Dict:
+        """
+        Create comprehensive data quality report
+
+        Args:
+            df: Options DataFrame
+
+        Returns:
+            Dictionary with data quality metrics
+        """
+        report = {
+            'summary': {
+                'total_records': len(df),
+                'data_completeness': {},
+                'quality_scores': {}
+            },
+            'field_analysis': {},
+            'data_issues': [],
+            'recommendations': []
+        }
+
+        if df.empty:
+            report['data_issues'].append("No data available")
+            return report
+
+        # Analyze data completeness
+        total_records = len(df)
+        for column in df.columns:
+            non_null_count = df[column].notna().sum()
+            completeness_pct = (non_null_count / total_records) * 100
+            report['summary']['data_completeness'][column] = {
+                'non_null_count': int(non_null_count),
+                'completeness_percentage': round(completeness_pct, 2),
+                'missing_count': int(total_records - non_null_count)
+            }
+
+            # Flag fields with low completeness
+            if completeness_pct < 80:
+                report['data_issues'].append(
+                    f"Low data completeness for {column}: {completeness_pct:.1f}%"
+                )
+
+        # Analyze price fields
+        price_fields = ['bid', 'ask', 'last', 'PX_BID', 'PX_ASK', 'PX_LAST']
+        for field in price_fields:
+            if field in df.columns:
+                field_data = df[field].dropna()
+                if len(field_data) > 0:
+                    report['field_analysis'][field] = {
+                        'min': float(field_data.min()),
+                        'max': float(field_data.max()),
+                        'mean': float(field_data.mean()),
+                        'std': float(field_data.std()) if len(field_data) > 1 else 0,
+                        'zero_values': int((field_data == 0).sum()),
+                        'negative_values': int((field_data < 0).sum())
+                    }
+
+                    # Flag unusual values
+                    if (field_data < 0).any():
+                        report['data_issues'].append(f"Negative values found in {field}")
+                    if (field_data == 0).sum() > total_records * 0.5:
+                        report['data_issues'].append(f"High number of zero values in {field}")
+
+        # Analyze spreads
+        if 'spread_pct' in df.columns:
+            spreads = df['spread_pct'].dropna()
+            if len(spreads) > 0:
+                wide_spreads = (spreads > 20).sum()
+                if wide_spreads > 0:
+                    report['data_issues'].append(
+                        f"{wide_spreads} options have spreads > 20%"
+                    )
+
+        # Analyze time series consistency
+        if 'fetch_date' in df.columns:
+            unique_dates = df['fetch_date'].nunique()
+            date_coverage = df.groupby('fetch_date').size()
+            report['field_analysis']['date_coverage'] = {
+                'unique_dates': int(unique_dates),
+                'records_per_date': date_coverage.to_dict(),
+                'avg_records_per_date': float(date_coverage.mean()),
+                'date_gaps': []
+            }
+
+            # Check for date gaps (if dates are properly formatted)
+            try:
+                dates = pd.to_datetime(df['fetch_date'].unique())
+                dates = sorted(dates)
+                for i in range(1, len(dates)):
+                    gap = (dates[i] - dates[i-1]).days
+                    if gap > 1:  # More than 1 day gap
+                        report['field_analysis']['date_coverage']['date_gaps'].append({
+                            'from': dates[i-1].strftime('%Y-%m-%d'),
+                            'to': dates[i].strftime('%Y-%m-%d'),
+                            'gap_days': gap
+                        })
+            except:
+                report['data_issues'].append("Date formatting issues prevent gap analysis")
+
+        # Calculate overall quality score
+        completeness_scores = [v['completeness_percentage'] for v in
+                             report['summary']['data_completeness'].values()]
+        avg_completeness = sum(completeness_scores) / len(completeness_scores) if completeness_scores else 0
+
+        quality_deductions = len(report['data_issues']) * 5  # 5 points per issue
+        overall_score = max(0, avg_completeness - quality_deductions)
+
+        report['summary']['quality_scores'] = {
+            'overall_score': round(overall_score, 2),
+            'data_completeness_score': round(avg_completeness, 2),
+            'issues_count': len(report['data_issues']),
+            'quality_grade': self._get_quality_grade(overall_score)
+        }
+
+        # Generate recommendations
+        if overall_score < 70:
+            report['recommendations'].append("Data quality is below acceptable threshold")
+        if len(report['data_issues']) > 0:
+            report['recommendations'].append("Address identified data issues before analysis")
+        if avg_completeness < 90:
+            report['recommendations'].append("Improve data collection to reduce missing values")
+
+        return report
+
+    def _get_quality_grade(self, score: float) -> str:
+        """Convert quality score to letter grade"""
+        if score >= 95:
+            return "A+"
+        elif score >= 90:
+            return "A"
+        elif score >= 85:
+            return "B+"
+        elif score >= 80:
+            return "B"
+        elif score >= 75:
+            return "C+"
+        elif score >= 70:
+            return "C"
+        elif score >= 60:
+            return "D"
+        else:
+            return "F"
 
 
 if __name__ == "__main__":

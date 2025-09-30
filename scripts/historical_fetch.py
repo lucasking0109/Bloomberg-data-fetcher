@@ -128,6 +128,18 @@ def main():
         processed_data = fetcher.processor.validate_data(transformed_data)
         logger.info(f"Validated {len(processed_data)} records")
 
+        # Generate data quality report
+        quality_report = fetcher.processor.create_data_quality_report(processed_data)
+        logger.info(f"Data quality grade: {quality_report['summary']['quality_scores']['quality_grade']} "
+                   f"(Score: {quality_report['summary']['quality_scores']['overall_score']:.1f})")
+
+        if quality_report['data_issues']:
+            logger.warning("Data quality issues detected:")
+            for issue in quality_report['data_issues'][:5]:  # Show first 5 issues
+                logger.warning(f"  - {issue}")
+            if len(quality_report['data_issues']) > 5:
+                logger.warning(f"  ... and {len(quality_report['data_issues']) - 5} more issues")
+
         # Save to database if requested
         if args.save_db:
             logger.info("Saving to database...")

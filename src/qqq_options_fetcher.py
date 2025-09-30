@@ -37,7 +37,18 @@ class QQQOptionsFetcher:
         'RHO',           # Rho
         'OPT_UNDL_PX',   # Underlying price
         'BID_SIZE',      # Bid size
-        'ASK_SIZE'       # Ask size
+        'ASK_SIZE',      # Ask size
+        'PX_SETTLE',     # Settlement price
+        'CHG_NET_1D',    # Net change 1 day
+        'CHG_PCT_1D',    # Percent change 1 day
+        'VOLATILITY_30D', # 30-day historical volatility
+        'PX_HIGH',       # High price
+        'PX_LOW',        # Low price
+        'TIME_LAST_UPD', # Last update time
+        'IVOL_BID',      # Implied volatility bid
+        'IVOL_ASK',      # Implied volatility ask
+        'MONEYNESS',     # Moneyness
+        'TIME_TO_EXPIRY' # Time to expiry in years
     ]
     
     def __init__(self, config_path: str = "config/config.yaml"):
