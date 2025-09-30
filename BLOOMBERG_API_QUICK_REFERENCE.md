@@ -1,103 +1,69 @@
 # Bloomberg API Installation - Quick Reference 🚀
 
-## ⚠️ Important: WAPI Command Retired (2024)
-The old `WAPI<GO>` command has been **RETIRED** by Bloomberg. Use the new methods below.
-
 ## 🎯 Current Installation Methods (2025)
 
-### Method 1: Official Pip Installation (Recommended - 2024)
+### Method 1: Official Pip Installation (Recommended)
 ```bash
-# Bloomberg's official pip repository (NO manual downloads needed)
+# Bloomberg's official pip repository
 python -m pip install --index-url=https://blpapi.bloomberg.com/repository/releases/python/simple/ blpapi
 
 # Verify installation
-python -c "import blpapi; print('Success!')"
+python -c "import blpapi; print('✅ Success!')"
 ```
 
 ### Method 2: Our Automated Setup (Easiest)
 ```bash
-# Run our official setup script
-python bloomberg_official_setup.py
-
-# Or use Windows GUI
-quick_setup.bat
+# Run our setup script (handles everything automatically)
+python setup_bloomberg_terminal.py
 ```
 
-### Method 3: Bloomberg Terminal (Legacy - Only if pip fails)
+### Method 3: Bloomberg Terminal (If pip fails)
 ```
 1. Open Bloomberg Terminal and log in
 2. Type: API<GO> (NOT the old WAPI<GO>)
 3. Navigate to "API Library" section
 4. Select "Python API" for your platform
-5. Download wheel and DLL files
-6. Use our setup script: python setup_bloomberg_terminal.py
+5. Download and install, then run: python setup_bloomberg_terminal.py
 ```
 
-### Method 4: Manual Installation (Last resort)
-```
-# Only if all other methods fail
-1. Download from Bloomberg Terminal: API<GO>
-2. Install wheel: pip install blpapi-*.whl --user
-3. Run diagnostics: python bloomberg_diagnostics.py
-4. Follow manual fix guide: MANUAL_FIX_GUIDE.md
-```
+## 🔧 Quick Setup Steps
 
-### Method 4: Account Verification
-```
-Bloomberg API requires:
-✅ Valid Bloomberg Terminal subscription
-✅ Bloomberg Terminal running and logged in
-✅ WAPI/API access enabled on your account
-✅ Contact Bloomberg support if API access is denied
-```
+1. **Ensure Prerequisites**:
+   - Bloomberg Terminal installed and logged in
+   - Python 3.6+ (64-bit)
+   - Administrator privileges
 
-## 🔧 Installation Steps
+2. **Install**:
+   ```bash
+   python setup_bloomberg_terminal.py
+   ```
 
-1. **Download** Bloomberg API from Developer Portal or Terminal
-2. **Run installer as Administrator** (CRITICAL!)
-3. **Select Python path**: `C:\Users\{username}\AppData\Local\Programs\Python\Python313\`
-4. **Verify installation**: `python -c "import blpapi; print('Success!')"`
-5. **Run diagnostics**: `python bloomberg_diagnostics.py`
-6. **Test connection**: `python setup_bloomberg_terminal.py`
+3. **Verify**:
+   ```bash
+   python -c "import blpapi; print('✅ Installation successful!')"
+   ```
 
 ## 🚨 Common Issues & Solutions
 
-### "WAPI was retired"
-- **Solution**: Use `API<GO>` instead of `WAPI<GO>`
-- **New URL**: https://www.bloomberg.com/professional/support/api-library/
-
-### "FileNotFoundError: blpapi3_64.dll"
-- **Solution 1**: Run `python setup_bloomberg_terminal.py` (auto-fix)
-- **Solution 2**: Run `python bloomberg_diagnostics.py` (diagnosis)
-- **Solution 3**: Copy DLL to Python directory manually
-
 ### "Import blpapi failed"
 - **Check**: Python is 64-bit (`python -c "import sys; print(sys.maxsize > 2**32)"`)
-- **Check**: DLL version matches wheel version
-- **Solution**: Reinstall with admin rights
+- **Solution**: Run `python setup_bloomberg_terminal.py` with administrator privileges
 
 ### "Connection to Bloomberg failed"
 - **Check**: Bloomberg Terminal is running and logged in
 - **Check**: Account has API access enabled
 - **Test**: Type `API<GO>` in Bloomberg Terminal
 
-### Permission Errors
-- **Solution**: Run Command Prompt as Administrator
-- **Alternative**: Use `--user` flag for pip installs
+### "FileNotFoundError: blpapi3_64.dll"
+- **Solution**: Run `python setup_bloomberg_terminal.py` (auto-fixes DLL issues)
 
 ## ✅ Verification Commands
 
 ```bash
-# Full diagnostic (RECOMMENDED)
-python bloomberg_diagnostics.py
-
-# Quick setup and test
+# Full setup and verification
 python setup_bloomberg_terminal.py
 
-# Manual import test
-python -c "import blpapi; print('✅ Success!')"
-
-# Connection test
+# Manual connection test
 python -c "import blpapi; s=blpapi.Session(); print('✅ Connected' if s.start() else '❌ Failed'); s.stop()"
 ```
 
@@ -109,22 +75,21 @@ Once installed and verified:
 python scripts/historical_fetch.py --quick-test
 
 # Web interface
-python app.py
+streamlit run app.py
 
-# Full data fetch
-python scripts/historical_fetch.py --days 30 --export-format parquet
+# Fetch QQQ options data
+python scripts/historical_fetch.py --days 30
 
-# Windows GUI
-run_bloomberg_fetcher.bat
+# Fetch individual stock options
+python scripts/constituents_fetch.py --ticker AAPL
 ```
 
 ## 📞 Support
 
 If issues persist:
-1. **Run diagnostics**: `python bloomberg_diagnostics.py`
+1. **Run setup again**: `python setup_bloomberg_terminal.py`
 2. **Check Bloomberg support**: https://www.bloomberg.com/professional/support/
 3. **Contact your Bloomberg representative** for API access issues
-4. **Check account permissions** - API access may need to be enabled
 
 ---
-**Need help?** Check `BLOOMBERG_SETUP.md` for detailed instructions.
+**⚠️ Important**: The old `WAPI<GO>` command was retired in 2024. Always use `API<GO>` instead.
