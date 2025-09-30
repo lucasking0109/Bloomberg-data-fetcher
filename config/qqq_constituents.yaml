@@ -128,11 +128,12 @@ fetch_config:
     - PE_RATIO       # P/E ratio
     - DIV_YIELD      # Dividend yield
     
-  # Options fields (same as QQQ)
+  # Options fields (enhanced set matching QQQ fetcher)
   option_fields:
     - PX_LAST        # Last price
     - PX_BID         # Bid price
     - PX_ASK         # Ask price
+    - PX_SETTLE      # Settlement price
     - VOLUME         # Volume
     - OPEN_INT       # Open interest (CRITICAL)
     - IVOL_MID       # Implied volatility
@@ -144,6 +145,17 @@ fetch_config:
     - OPT_UNDL_PX    # Underlying price
     - BID_SIZE       # Bid size
     - ASK_SIZE       # Ask size
+    - CHG_NET_1D     # 1-day net change
+    - CHG_PCT_1D     # 1-day % change
+    - VOLATILITY_30D # 30-day volatility
+    - TIME_VALUE     # Time value
+    - INTRINSIC_VAL  # Intrinsic value
+    - MONEYNESS      # Moneyness (S/K)
+    - OPT_DELTA_NEUTRAL_EQUIV  # Delta neutral equivalent
+    - PX_HIGH        # High price
+    - PX_LOW         # Low price
+    - PX_OPEN        # Open price
+    - VOLUME_AVG_10D # 10-day average volume
 
 # API usage budgets per constituent
 usage_limits:

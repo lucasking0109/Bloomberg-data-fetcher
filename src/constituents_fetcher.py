@@ -18,7 +18,6 @@ from .bloomberg_api import BloombergAPI
 from .usage_monitor import UsageMonitor
 from .data_processor import DataProcessor
 from .database_manager import DatabaseManager
-from .fetch_state_manager import FetchStateManager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,7 +47,6 @@ class ConstituentsFetcher:
         self.monitor = UsageMonitor(self.config.get('limits', {}))
         self.processor = DataProcessor()
         self.db = DatabaseManager(self.config.get('output', {}).get('database_path', 'data/bloomberg_options.db'))
-        self.state_manager = FetchStateManager()
         
         # Extract configuration
         self.fetch_config = self.constituents_config.get('fetch_config', {})
@@ -320,16 +318,10 @@ class ConstituentsFetcher:
         
         # Get tickers to fetch
         tickers = self.get_constituent_tickers()
-        
-        # Initialize or resume state
-        if resume and self.state_manager.state['status'] != 'initialized':
-            logger.info("Resuming from previous state")
-            resume_ticker = self.state_manager.get_resume_point()
-            if resume_ticker:
-                start_index = tickers.index(resume_ticker) if resume_ticker in tickers else 0
-                tickers = tickers[start_index:]
-        else:
-            self.state_manager.initialize_tickers(tickers)
+
+        # Note: Resume functionality removed with state manager
+        if resume:
+            logger.warning("Resume functionality not available - fetching all tickers")
         
         results = {
             'successful': [],
@@ -339,10 +331,6 @@ class ConstituentsFetcher:
         }
         
         for ticker in tickers:
-            # Check if we should process this ticker
-            if not self.state_manager.start_ticker(ticker):
-                continue
-            
             retry_count = 0
             success = False
             
@@ -375,19 +363,15 @@ class ConstituentsFetcher:
                             records_saved = self.db.save_options_data(processed_data)
                             logger.info(f"Saved {records_saved} options records for {ticker}")
                         
-                        # Update state
+                        # Update results
                         total_records = len(equity_data) + len(processed_data)
                         api_points = len(self.equity_fields) + len(processed_data) * len(self.option_fields)
-                        
-                        self.state_manager.complete_ticker(ticker, total_records, api_points)
+
                         results['successful'].append(ticker)
                         results['total_records'] += total_records
                         results['total_api_points'] += api_points
-                        
+
                         success = True
-                        
-                        # Save checkpoint after each successful ticker
-                        self.state_manager.save_checkpoint()
                         
                     else:
                         raise Exception("No options data fetched")
@@ -400,20 +384,20 @@ class ConstituentsFetcher:
                         logger.info(f"Retrying in {self.retry_delay} seconds...")
                         time.sleep(self.retry_delay)
                     else:
-                        self.state_manager.fail_ticker(ticker, str(e), retry_count)
+                        logger.error(f"Failed to process {ticker} after {retry_count} attempts: {e}")
                         results['failed'].append(ticker)
             
             # Show progress
-            progress = self.state_manager.get_progress_summary()
-            logger.info(f"\nProgress: {progress['completed']}/{progress['total_tickers']} "
-                       f"({progress['progress_percentage']:.1f}%)")
-            
+            completed = len(results['successful']) + len(results['failed'])
+            total = len(tickers)
+            progress_pct = (completed / total) * 100 if total > 0 else 0
+            logger.info(f"\nProgress: {completed}/{total} ({progress_pct:.1f}%)")
+
             # Check API usage
             self.monitor.print_usage_report()
-            
+
             # Small delay between tickers
-            if self.state_manager.get_next_ticker():
-                time.sleep(2)
+            time.sleep(2)
         
         # Final summary
         logger.info("\n" + "="*60)
@@ -426,7 +410,6 @@ class ConstituentsFetcher:
         
         if results['failed']:
             logger.warning(f"Failed tickers: {results['failed']}")
-            self.state_manager.export_failed_tickers()
         
         return results
     

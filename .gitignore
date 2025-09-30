@@ -76,7 +76,7 @@ config/private.yaml
 .env.local
 .env.production
 
-# Claude AI settings (may contain local paths and personal settings)
+# Local settings and configurations
 .claude/
 
 # Bloomberg API responses (may contain sensitive data)
