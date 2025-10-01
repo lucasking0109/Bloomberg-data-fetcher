@@ -355,7 +355,7 @@ class QQQOptionsFetcher:
             # Fetch historical data
             data = self.api.fetch_historical_data(
                 filtered_tickers,
-                self.OPTION_FIELDS[:6],  # Limit fields for historical
+                self.OPTION_FIELDS[:11],  # Include Greeks (first 11 fields)
                 start_date,
                 end_date,
                 "DAILY"
@@ -366,7 +366,7 @@ class QQQOptionsFetcher:
                 all_data.append(data)
             
             # Update usage monitor
-            self.monitor.record_usage(len(data) * 6)
+            self.monitor.record_usage(len(data) * 11)
         
         # Combine all data
         if all_data:
