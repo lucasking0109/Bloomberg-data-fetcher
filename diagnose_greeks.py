@@ -110,29 +110,9 @@ class GreeksDiagnostic:
 
     def check_async_blp_comparison(self):
         """檢查async_blp可用性及比較"""
-        print("\n" + "="*60)
-        print("🔄 Async_blp 比較分析")
-        print("="*60)
-
-        try:
-            import async_blp
-            print("\n✅ async_blp 函式庫可用")
-            print("\n📊 與現有實作的差異:")
-            print("1. async_blp 使用非同步操作 (對多個請求更快)")
-            print("2. 現有程式使用同步 blpapi (較慢但穩定)")
-            print("3. 兩者都能抓到Greeks - 問題在程式碼限制，不在API方法")
-            print("\n💡 你的async方法:")
-            print("   async_blp直接指定Greeks欄位，所以能成功")
-            print("   現有程式碼被[:6]限制，所以失敗")
-            return True
-        except ImportError:
-            print("\n❌ async_blp 函式庫未安裝")
-            print("\n📝 比較結論:")
-            print("1. 現有blpapi可以抓到Greeks")
-            print("2. 問題是程式碼限制，不是API問題")
-            print("3. 修復[:6]限制即可解決")
-            print("\n安裝async_blp: pip install async-blp")
-            return False
+        # 移除 async_blp 檢查，因為不是必需的
+        # 我們使用標準的 blpapi
+        return True
 
     def run_all_tests(self):
         """執行增強版診斷測試"""
@@ -144,9 +124,6 @@ class GreeksDiagnostic:
 
         # 步驟1: 分析程式碼問題
         self.analyze_codebase_problems()
-
-        # 步驟2: 比較async_blp方法
-        self.check_async_blp_comparison()
 
         # 步驟3: Bloomberg連線測試
         print("\n" + "="*60)
