@@ -145,18 +145,18 @@ class BloombergAPI:
             logger.error(f"Error fetching historical data: {e}")
             return pd.DataFrame()
     
-    def fetch_reference_data(self, 
-                           tickers: List[str], 
+    def fetch_reference_data(self,
+                           tickers: List[str],
                            fields: List[str],
                            max_retries: int = 2) -> pd.DataFrame:
         """
         Fetch reference data using BDP (Bloomberg Data Point) with retry logic
-        
+
         Args:
             tickers: List of Bloomberg tickers
             fields: List of fields to fetch
             max_retries: Maximum number of retry attempts
-            
+
         Returns:
             DataFrame with reference data
         """
@@ -165,39 +165,124 @@ class BloombergAPI:
             # Try to reconnect
             if not self.connect():
                 return pd.DataFrame()
-        
+
         for attempt in range(max_retries):
             try:
                 request = self.service.createRequest("ReferenceDataRequest")
-                
+
                 # Add securities
                 for ticker in tickers:
                     request.getElement("securities").appendValue(ticker)
-                
+
                 # Add fields
                 for field in fields:
                     request.getElement("fields").appendValue(field)
-                
+
                 # Send request
                 logger.info(f"Fetching reference data for {len(tickers)} tickers (attempt {attempt + 1}/{max_retries})")
                 self.session.sendRequest(request)
-                
+
                 # Process response
                 data = self._process_reference_response()
-                
+
                 if not data.empty:
                     return data
                 elif attempt < max_retries - 1:
                     logger.warning(f"Empty response, retrying...")
                     time.sleep(2)
-                    
+
             except Exception as e:
                 logger.error(f"Error fetching reference data (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
                     time.sleep(2)
                 else:
                     return pd.DataFrame()
-        
+
+        return pd.DataFrame()
+
+    def fetch_eod_reference_data(self,
+                                tickers: List[str],
+                                fields: List[str],
+                                settle_date: Optional[str] = None,
+                                max_retries: int = 2) -> pd.DataFrame:
+        """
+        Fetch EOD reference data with SETTLE_DT override for options Greeks
+
+        Args:
+            tickers: List of Bloomberg tickers
+            fields: List of fields to fetch (e.g., Greeks, prices)
+            settle_date: Settlement date in YYYYMMDD format (None for current)
+            max_retries: Maximum number of retry attempts
+
+        Returns:
+            DataFrame with EOD reference data including Greeks
+        """
+        if not self.connected:
+            logger.error("Not connected to Bloomberg")
+            if not self.connect():
+                return pd.DataFrame()
+
+        # If no settle_date provided, use previous business day
+        if settle_date is None:
+            from datetime import datetime, timedelta
+            today = datetime.now()
+            # Get previous business day (skip weekends)
+            if today.weekday() == 0:  # Monday
+                settle_date = (today - timedelta(days=3)).strftime("%Y%m%d")
+            elif today.weekday() == 6:  # Sunday
+                settle_date = (today - timedelta(days=2)).strftime("%Y%m%d")
+            else:
+                settle_date = (today - timedelta(days=1)).strftime("%Y%m%d")
+
+        for attempt in range(max_retries):
+            try:
+                request = self.service.createRequest("ReferenceDataRequest")
+
+                # Add securities
+                for ticker in tickers:
+                    request.getElement("securities").appendValue(ticker)
+
+                # Add fields - include both price and Greeks fields
+                eod_fields = fields.copy()
+                # Ensure we have EOD/Settlement fields
+                if 'PX_SETTLE' not in eod_fields:
+                    eod_fields.append('PX_SETTLE')
+                if 'SETTLE_DT' not in eod_fields and settle_date:
+                    eod_fields.append('SETTLE_DT')
+
+                for field in eod_fields:
+                    request.getElement("fields").appendValue(field)
+
+                # Add SETTLE_DT override if provided
+                if settle_date:
+                    overrides = request.getElement("overrides")
+                    override1 = overrides.appendElement()
+                    override1.setElement("fieldId", "SETTLE_DT")
+                    override1.setElement("value", settle_date)
+                    logger.info(f"Using SETTLE_DT override: {settle_date}")
+
+                # Send request
+                logger.info(f"Fetching EOD data for {len(tickers)} tickers, date: {settle_date}")
+                self.session.sendRequest(request)
+
+                # Process response
+                data = self._process_reference_response()
+
+                if not data.empty:
+                    # Add settle_date to dataframe
+                    data['settle_date'] = settle_date
+                    return data
+                elif attempt < max_retries - 1:
+                    logger.warning(f"Empty response, retrying...")
+                    time.sleep(2)
+
+            except Exception as e:
+                logger.error(f"Error fetching EOD data (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2)
+                else:
+                    return pd.DataFrame()
+
         return pd.DataFrame()
     
     def _process_historical_response(self) -> pd.DataFrame:

@@ -24,6 +24,15 @@ except ImportError:
     GREEKS_CALCULATOR_AVAILABLE = False
     logging.warning("Greeks calculator not available. Install scipy: pip install scipy")
 
+# Try to import EOD Greeks components
+try:
+    from .eod_greeks_fetcher import EODGreeksFetcher
+    from .greeks_database import GreeksDatabase
+    EOD_GREEKS_AVAILABLE = True
+except ImportError:
+    EOD_GREEKS_AVAILABLE = False
+    logging.warning("EOD Greeks components not available")
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -60,12 +69,13 @@ class QQQOptionsFetcher:
         'TIME_TO_EXPIRY' # Time to expiry in years
     ]
     
-    def __init__(self, config_path: str = "config/config.yaml"):
+    def __init__(self, config_path: str = "config/config.yaml", use_eod_greeks: bool = True):
         """
         Initialize QQQ Options Fetcher
-        
+
         Args:
             config_path: Path to configuration file
+            use_eod_greeks: Whether to use EOD Greeks database
         """
         self.config = self._load_config(config_path)
         self.api = BloombergAPI(
@@ -74,6 +84,13 @@ class QQQOptionsFetcher:
         )
         self.monitor = UsageMonitor(self.config.get('limits', {}))
         self.processor = DataProcessor()
+
+        # Initialize EOD Greeks components if available and requested
+        self.use_eod_greeks = use_eod_greeks and EOD_GREEKS_AVAILABLE
+        if self.use_eod_greeks:
+            self.eod_fetcher = EODGreeksFetcher(config_path)
+            self.greeks_db = GreeksDatabase()
+            logger.info("EOD Greeks components initialized")
         
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from YAML file"""
@@ -493,43 +510,112 @@ class QQQOptionsFetcher:
         
         return strikes[sorted_indices[:n]].tolist()
     
-    def fetch_eod_data(self) -> pd.DataFrame:
+    def fetch_eod_data(self, use_eod_method: bool = True) -> pd.DataFrame:
         """
-        Fetch end-of-day options data
-        Perfect for daily execution after market close
-        
+        Fetch end-of-day options data with Greeks
+
+        Args:
+            use_eod_method: Use EOD-specific method with SETTLE_DT override
+
         Returns:
-            DataFrame with EOD options data
+            DataFrame with EOD options data including Greeks
         """
         logger.info("Fetching end-of-day QQQ options data")
-        
+
+        # If EOD Greeks components available, use specialized fetcher
+        if use_eod_method and self.use_eod_greeks:
+            logger.info("Using EOD Greeks fetcher with SETTLE_DT override")
+            data = self.eod_fetcher.fetch_eod_greeks("QQQ")
+
+            if not data.empty:
+                # Save to database
+                settle_date = datetime.now().strftime("%Y-%m-%d")
+                self.greeks_db.insert_eod_data(data, settle_date)
+
+                # Save to file
+                self.save_data(data, suffix="_eod_greeks")
+
+                return data
+            else:
+                logger.warning("EOD fetcher returned no data, falling back to standard method")
+
+        # Standard method (backward compatible)
         if not self.api.connected:
             self.api.connect()
-        
+
         # Get current spot price
         spot_price = self.get_qqq_spot_price()
-        
+
         # Get next 3 monthly expiries
         expiries = self.get_expiry_dates()
-        
+
         all_data = []
-        
+
         for expiry in expiries:
             data = self.fetch_options_chain(expiry, spot_price)
-            
+
             if not data.empty:
                 all_data.append(data)
-        
+
         # Combine and save
         if all_data:
             combined_data = pd.concat(all_data, ignore_index=True)
-            
+
             # Save to file
             self.save_data(combined_data)
-            
+
             return combined_data
-        
+
         return pd.DataFrame()
+
+    def fetch_eod_greeks_with_history(self,
+                                      days_back: int = 30,
+                                      save_to_db: bool = True) -> pd.DataFrame:
+        """
+        Fetch EOD Greeks with historical data from database
+
+        Args:
+            days_back: Number of days of history to include
+            save_to_db: Whether to save new data to database
+
+        Returns:
+            DataFrame with EOD Greeks including historical data
+        """
+        if not self.use_eod_greeks:
+            logger.warning("EOD Greeks components not available")
+            return pd.DataFrame()
+
+        logger.info(f"Fetching EOD Greeks with {days_back} days of history")
+
+        # Get today's EOD Greeks
+        today_data = self.eod_fetcher.fetch_eod_greeks("QQQ")
+
+        if save_to_db and not today_data.empty:
+            # Save to database
+            settle_date = datetime.now().strftime("%Y-%m-%d")
+            self.greeks_db.insert_eod_data(today_data, settle_date)
+
+        # Get historical data from database
+        start_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        end_date = datetime.now().strftime("%Y-%m-%d")
+
+        historical_data = self.greeks_db.query_greeks(start_date, end_date, "QQQ")
+
+        # Combine today's and historical data
+        if not today_data.empty and not historical_data.empty:
+            combined = pd.concat([historical_data, today_data], ignore_index=True)
+            # Remove duplicates, keeping most recent
+            combined = combined.drop_duplicates(
+                subset=['settle_date', 'ticker'],
+                keep='last'
+            )
+            return combined
+        elif not today_data.empty:
+            return today_data
+        elif not historical_data.empty:
+            return historical_data
+        else:
+            return pd.DataFrame()
     
     def save_data(self, df: pd.DataFrame, suffix: str = ""):
         """Save data to file with intelligent naming for historical data"""
