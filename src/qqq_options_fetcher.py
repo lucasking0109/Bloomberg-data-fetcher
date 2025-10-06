@@ -11,6 +11,7 @@ from typing import List, Dict, Optional, Tuple
 import logging
 import yaml
 import os
+import time
 from .bloomberg_api import BloombergAPI
 from .usage_monitor import UsageMonitor
 from .data_processor import DataProcessor
@@ -223,26 +224,27 @@ class QQQOptionsFetcher:
         
         return third_friday
     
-    def fetch_options_chain(self, 
+    def fetch_options_chain(self,
                            expiry: str,
                            spot_price: Optional[float] = None) -> pd.DataFrame:
         """
-        Fetch complete options chain for an expiry
-        
+        Fetch complete options chain for an expiry using hybrid approach:
+        - Reference Data API for all current data including Greeks
+
         Args:
             expiry: Expiry date (YYYYMMDD)
             spot_price: Current spot price (will fetch if not provided)
-            
+
         Returns:
-            DataFrame with options data
+            DataFrame with options data including Greeks
         """
         # Get spot price if not provided
         if spot_price is None:
             spot_price = self.get_qqq_spot_price()
-        
+
         # Calculate strike range
         min_strike, max_strike, interval = self.calculate_strike_range(spot_price)
-        
+
         # Generate option tickers
         tickers = self.api.get_option_chain(
             "QQQ",
@@ -251,39 +253,65 @@ class QQQOptionsFetcher:
             max_strike,
             interval
         )
-        
+
         logger.info(f"Fetching {len(tickers)} options for expiry {expiry}")
-        
+
         # Check API usage before fetching
         estimated_usage = len(tickers) * len(self.OPTION_FIELDS)
         if not self.monitor.can_make_request(estimated_usage):
             logger.warning("API limit would be exceeded, skipping request")
             return pd.DataFrame()
-        
-        # Fetch data in batches
+
+        # Fetch ALL fields using Reference Data API for current snapshot
+        # This should include Greeks
         config = self.config.get('limits', {})
         batch_size = config.get('batch_size', 20)
         delay = config.get('request_delay', 1.0)
-        
-        data = self.api.batch_request(
-            tickers,
-            self.OPTION_FIELDS,
-            batch_size,
-            delay
-        )
-        
+
+        # Use Reference Data API which should provide Greeks
+        all_data = []
+
+        # Process in batches
+        for i in range(0, len(tickers), batch_size):
+            batch_tickers = tickers[i:i + batch_size]
+
+            try:
+                # Fetch all fields including Greeks via Reference Data
+                batch_data = self.api.fetch_reference_data(
+                    batch_tickers,
+                    self.OPTION_FIELDS  # All 26 fields including Greeks
+                )
+
+                if not batch_data.empty:
+                    all_data.append(batch_data)
+                    logger.info(f"Fetched batch {i//batch_size + 1}: {len(batch_data)} options with Greeks")
+
+                # Delay between batches
+                if i + batch_size < len(tickers):
+                    time.sleep(delay)
+
+            except Exception as e:
+                logger.warning(f"Error fetching batch: {e}")
+                continue
+
+        # Combine all batches
+        if all_data:
+            data = pd.concat(all_data, ignore_index=True)
+        else:
+            data = pd.DataFrame()
+
         # Update usage monitor
         self.monitor.record_usage(len(data) * len(self.OPTION_FIELDS))
-        
+
         # Process and add metadata
         if not data.empty:
             data['expiry'] = expiry
             data['fetch_time'] = datetime.now()
             data['spot_price'] = spot_price
-            
+
             # Parse ticker to extract strike and type
             data = self._parse_tickers(data)
-        
+
         return data
     
     def _parse_tickers(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -303,34 +331,36 @@ class QQQOptionsFetcher:
                                 end_date: str,
                                 expiries: Optional[List[str]] = None) -> pd.DataFrame:
         """
-        Fetch historical options data
-        
+        Fetch historical options data with hybrid approach:
+        - Historical Data API for price/volume data
+        - Reference Data API for Greeks
+
         Args:
             start_date: Start date (YYYYMMDD)
             end_date: End date (YYYYMMDD)
             expiries: List of expiry dates (will generate if not provided)
-            
+
         Returns:
-            DataFrame with historical options data
+            DataFrame with historical options data including Greeks
         """
         if not self.api.connected:
             self.api.connect()
-        
+
         # Get expiries if not provided
         if expiries is None:
             expiries = self.get_expiry_dates()
-        
+
         all_data = []
-        
+
         for expiry in expiries:
             logger.info(f"Fetching historical data for expiry {expiry}")
-            
+
             # Get spot price (use current as approximation)
             spot_price = self.get_qqq_spot_price()
-            
+
             # Calculate strike range
             min_strike, max_strike, interval = self.calculate_strike_range(spot_price)
-            
+
             # Generate option tickers
             tickers = self.api.get_option_chain(
                 "QQQ",
@@ -339,39 +369,66 @@ class QQQOptionsFetcher:
                 max_strike,
                 interval
             )
-            
+
             # Limit tickers to most liquid ones (near ATM)
             atm_strikes = self._get_atm_strikes(spot_price, min_strike, max_strike, interval, n=10)
             filtered_tickers = [t for t in tickers if any(f"{s:.0f}" in t for s in atm_strikes)]
-            
+
             logger.info(f"Fetching {len(filtered_tickers)} near-ATM options")
-            
+
             # Check API usage
             estimated_usage = len(filtered_tickers) * len(self.OPTION_FIELDS) * 60  # 60 days
             if not self.monitor.can_make_request(estimated_usage):
                 logger.warning("API limit would be exceeded, reducing scope")
                 filtered_tickers = filtered_tickers[:10]  # Reduce to 10 options
-            
-            # Fetch historical data
-            data = self.api.fetch_historical_data(
+
+            # HYBRID APPROACH:
+            # 1. Fetch historical price/volume data
+            price_fields = ['PX_LAST', 'PX_BID', 'PX_ASK', 'VOLUME', 'OPEN_INT', 'IVOL_MID']
+            historical_data = self.api.fetch_historical_data(
                 filtered_tickers,
-                self.OPTION_FIELDS[:11],  # Include Greeks (first 11 fields)
+                price_fields,
                 start_date,
                 end_date,
                 "DAILY"
             )
-            
-            if not data.empty:
-                data['expiry'] = expiry
-                all_data.append(data)
-            
+
+            # 2. Fetch current Greeks using Reference Data API
+            greeks_fields = ['DELTA', 'GAMMA', 'THETA', 'VEGA', 'RHO']
+            try:
+                greeks_data = self.api.fetch_reference_data(
+                    filtered_tickers,
+                    greeks_fields
+                )
+
+                # Merge Greeks with historical data
+                if not historical_data.empty and not greeks_data.empty:
+                    # Add Greeks to each row of historical data
+                    for greek in greeks_fields:
+                        if greek in greeks_data.columns:
+                            # Map Greeks by ticker
+                            greeks_dict = greeks_data.set_index('ticker')[greek].to_dict()
+                            historical_data[greek] = historical_data['ticker'].map(greeks_dict)
+
+                    logger.info(f"Successfully merged Greeks data for {len(filtered_tickers)} options")
+                else:
+                    logger.warning("Greeks data not available, continuing with price data only")
+
+            except Exception as e:
+                logger.warning(f"Could not fetch Greeks: {e}")
+                # Continue with just price data
+
+            if not historical_data.empty:
+                historical_data['expiry'] = expiry
+                all_data.append(historical_data)
+
             # Update usage monitor
-            self.monitor.record_usage(len(data) * 11)
-        
+            self.monitor.record_usage(len(historical_data) * 11)
+
         # Combine all data
         if all_data:
             return pd.concat(all_data, ignore_index=True)
-        
+
         return pd.DataFrame()
     
     def _get_atm_strikes(self, 
