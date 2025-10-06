@@ -4,6 +4,7 @@
 # Data Processing
 pandas>=2.0.0
 numpy>=1.24.0
+scipy>=1.7.0  # For Black-Scholes Greeks calculation
 
 # Configuration
 PyYAML>=6.0

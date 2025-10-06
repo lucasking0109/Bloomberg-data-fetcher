@@ -16,6 +16,14 @@ from .bloomberg_api import BloombergAPI
 from .usage_monitor import UsageMonitor
 from .data_processor import DataProcessor
 
+# Try to import Greeks calculator
+try:
+    from .greeks_calculator import GreeksCalculator
+    GREEKS_CALCULATOR_AVAILABLE = True
+except ImportError:
+    GREEKS_CALCULATOR_AVAILABLE = False
+    logging.warning("Greeks calculator not available. Install scipy: pip install scipy")
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -393,30 +401,71 @@ class QQQOptionsFetcher:
                 "DAILY"
             )
 
-            # 2. Fetch current Greeks using Reference Data API
+            # 2. Try to fetch Greeks using Reference Data API
             greeks_fields = ['DELTA', 'GAMMA', 'THETA', 'VEGA', 'RHO']
+            greeks_fetched = False
+
             try:
                 greeks_data = self.api.fetch_reference_data(
                     filtered_tickers,
                     greeks_fields
                 )
 
-                # Merge Greeks with historical data
-                if not historical_data.empty and not greeks_data.empty:
-                    # Add Greeks to each row of historical data
-                    for greek in greeks_fields:
-                        if greek in greeks_data.columns:
-                            # Map Greeks by ticker
-                            greeks_dict = greeks_data.set_index('ticker')[greek].to_dict()
-                            historical_data[greek] = historical_data['ticker'].map(greeks_dict)
+                # Check if Greeks actually have values
+                if not greeks_data.empty:
+                    has_greeks = any(greeks_data[field].notna().any()
+                                    for field in greeks_fields
+                                    if field in greeks_data.columns)
 
-                    logger.info(f"Successfully merged Greeks data for {len(filtered_tickers)} options")
-                else:
-                    logger.warning("Greeks data not available, continuing with price data only")
+                    if has_greeks:
+                        # Merge Greeks with historical data
+                        for greek in greeks_fields:
+                            if greek in greeks_data.columns:
+                                # Map Greeks by ticker
+                                greeks_dict = greeks_data.set_index('ticker')[greek].to_dict()
+                                historical_data[greek] = historical_data['ticker'].map(greeks_dict)
+
+                        logger.info(f"Successfully merged Bloomberg Greeks for {len(filtered_tickers)} options")
+                        greeks_fetched = True
+                    else:
+                        logger.warning("Bloomberg Greeks fields exist but have no values")
 
             except Exception as e:
-                logger.warning(f"Could not fetch Greeks: {e}")
-                # Continue with just price data
+                logger.warning(f"Could not fetch Greeks from Bloomberg: {e}")
+
+            # 3. If Bloomberg Greeks not available, calculate them using Black-Scholes
+            if not greeks_fetched and GREEKS_CALCULATOR_AVAILABLE and not historical_data.empty:
+                logger.info("Calculating Greeks using Black-Scholes model...")
+
+                try:
+                    calculator = GreeksCalculator(risk_free_rate=0.045)  # Current US risk-free rate
+
+                    # Ensure we have required fields
+                    if 'IVOL_MID' in historical_data.columns:
+                        # Parse strike from ticker if not already present
+                        if 'strike' not in historical_data.columns:
+                            historical_data = self._parse_tickers(historical_data)
+
+                        # Add underlying price if not present
+                        if 'OPT_UNDL_PX' not in historical_data.columns:
+                            historical_data['OPT_UNDL_PX'] = spot_price
+
+                        # Calculate Greeks
+                        historical_data = calculator.add_greeks_to_dataframe(
+                            historical_data,
+                            spot_col='OPT_UNDL_PX',
+                            strike_col='strike',
+                            expiry_col='expiry',
+                            ivol_col='IVOL_MID',
+                            type_col='option_type'
+                        )
+
+                        logger.info("✅ Greeks calculated successfully using Black-Scholes")
+                    else:
+                        logger.warning("Cannot calculate Greeks: IVOL_MID not available")
+
+                except Exception as e:
+                    logger.warning(f"Error calculating Greeks: {e}")
 
             if not historical_data.empty:
                 historical_data['expiry'] = expiry
