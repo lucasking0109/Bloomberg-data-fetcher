@@ -57,7 +57,7 @@ st.markdown("""
 class BloombergFetcherApp:
     def __init__(self):
         self.db = DatabaseManager()
-        self.monitor = UsageMonitor()
+        self.monitor = UsageMonitor({})
 
     def get_database_stats(self):
         """Get database statistics"""
